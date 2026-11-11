@@ -38,7 +38,14 @@ abstract contract Base is Test {
         tm = new MockTroveManager();
         pf = new MockPriceFeed();
         shield = new SellarShield(
-            IERC20(address(musd)), IStabilityPool(address(sp)), reviewer, BOND, CLAIM_CAP, COVER_WINDOW, RESOLVE_TIMEOUT
+            IERC20(address(musd)),
+            IStabilityPool(address(sp)),
+            IPriceFeed(address(pf)),
+            reviewer,
+            BOND,
+            CLAIM_CAP,
+            COVER_WINDOW,
+            RESOLVE_TIMEOUT
         );
         safe = new SellarSafe(
             IERC20(address(musd)), shield, ITroveManager(address(tm)), IPriceFeed(address(pf)), FEE_BPS, HOLD_TTL

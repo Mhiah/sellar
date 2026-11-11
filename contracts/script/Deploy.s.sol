@@ -5,9 +5,10 @@ import {Script, console} from "forge-std/Script.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SellarSafe} from "../src/SellarSafe.sol";
 import {SellarShield} from "../src/SellarShield.sol";
+import {SellarFaucet} from "../src/SellarFaucet.sol";
 import {IStabilityPool, ITroveManager, IPriceFeed} from "../src/interfaces/IMezo.sol";
 
-/// Deploys SellarShield and SellarSafe against Mezo's own MUSD contracts.
+/// Deploys SellarShield, SellarSafe and (on testnet) SellarFaucet against Mezo's own MUSD contracts.
 /// Addresses are from the official package mezo-org/musd-contracts v1.1.0 on npm.
 ///
 ///   forge script script/Deploy.s.sol --rpc-url mezo_testnet --broadcast
@@ -52,6 +53,7 @@ contract Deploy is Script {
         SellarShield shield = new SellarShield(
             IERC20(m.musd),
             IStabilityPool(m.stabilityPool),
+            IPriceFeed(m.priceFeed),
             reviewer,
             10e18, // bond per report: 10 MUSD
             500e18, // largest refund per payment: 500 MUSD
@@ -67,9 +69,12 @@ contract Deploy is Script {
             1 days // owner has a day to approve a hold
         );
         shield.setSafe(address(safe));
+        // Testnet only: a faucet that puts 25 test MUSD into a new user's safe, once per address.
+        address faucet = block.chainid == 31611 ? address(new SellarFaucet(IERC20(m.musd), safe, 25e18)) : address(0);
         vm.stopBroadcast();
 
         console.log("SellarShield", address(shield));
-        console.log("SellarSafe  ", address(safe));
+        console.log("SellarSafe", address(safe));
+        console.log("SellarFaucet", faucet);
     }
 }

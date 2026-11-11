@@ -4,7 +4,7 @@ pragma solidity 0.8.28;
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
-import {IStabilityPool} from "./interfaces/IMezo.sol";
+import {IStabilityPool, IPriceFeed} from "./interfaces/IMezo.sol";
 
 /// @title SellarShield
 /// @notice A shared scam list and a cover fund for agent payments, both in MUSD.
@@ -19,6 +19,8 @@ import {IStabilityPool} from "./interfaces/IMezo.sol";
 ///
 /// Mezo: the cover fund keeps a liquid buffer and deposits the rest in Mezo's Stability Pool, where it
 /// earns BTC from liquidations. Reporter bonds are never deposited, so they can always be returned.
+/// Anyone can buy the fund's BTC with MUSD at Mezo's own price feed minus a small discount, which
+/// turns what the fund earns back into MUSD that can pay refunds.
 ///
 /// Trust model for this version: the reviewer decides confirm or dismiss. The reviewer cannot move
 /// funds, change parameters or block bond withdrawals after the resolve timeout.
@@ -47,6 +49,7 @@ contract SellarShield is ReentrancyGuard {
         uint128 amount;
         uint64 paidAt;
         bool claimed;
+        bool warned; // the payee was already on the scam list when this was paid
     }
 
     uint256 public constant BPS = 10_000;
@@ -56,9 +59,12 @@ contract SellarShield is ReentrancyGuard {
     uint256 public constant MAX_CLAIM_SHARE_BPS = 2_000;
     /// Share of unreserved BTC gains paid to the reporters of a confirmed case.
     uint256 public constant REWARD_BPS = 1_000;
+    /// Discount to Mezo's price feed when the fund sells BTC for MUSD.
+    uint256 public constant BTC_DISCOUNT_BPS = 100;
 
     IERC20 public immutable musd;
     IStabilityPool public immutable stabilityPool;
+    IPriceFeed public immutable priceFeed;
     /// MUSD locked with each report.
     uint256 public immutable bond;
     /// Largest refund for one payment.
@@ -82,6 +88,7 @@ contract SellarShield is ReentrancyGuard {
     mapping(address suspect => Case) public cases;
     mapping(address suspect => mapping(uint32 round => mapping(address reporter => bool))) public hasReported;
     Receipt[] public receipts;
+    mapping(address payer => uint256[]) private _receiptsOf;
 
     event Reported(address indexed suspect, address indexed reporter, uint32 round, bytes32 evidence);
     event Confirmed(address indexed suspect, uint32 reporters, uint256 btcPerReporter);
@@ -90,6 +97,7 @@ contract SellarShield is ReentrancyGuard {
     event PaymentRecorded(uint256 indexed receiptId, address indexed payer, address indexed payee, uint256 amount);
     event Claimed(uint256 indexed receiptId, address indexed payer, uint256 payout);
     event Rebalanced(uint256 liquid, uint256 inStabilityPool);
+    event BtcSold(address indexed buyer, uint256 btcAmount, uint256 musdPaid, uint256 price);
     event ReviewerChanged(address indexed reviewer);
 
     error NotReviewer();
@@ -110,6 +118,9 @@ contract SellarShield is ReentrancyGuard {
     error OutsideCoverWindow();
     error FundBusy();
     error BtcTransferFailed();
+    error NotEnoughBtc();
+    error CostsMoreThanMax();
+    error NoPrice();
 
     modifier onlyReviewer() {
         if (msg.sender != reviewer) revert NotReviewer();
@@ -119,17 +130,20 @@ contract SellarShield is ReentrancyGuard {
     constructor(
         IERC20 musd_,
         IStabilityPool stabilityPool_,
+        IPriceFeed priceFeed_,
         address reviewer_,
         uint256 bond_,
         uint256 claimCap_,
         uint256 coverWindow_,
         uint256 resolveTimeout_
     ) {
-        if (address(musd_) == address(0) || address(stabilityPool_) == address(0) || reviewer_ == address(0)) {
-            revert ZeroAddress();
-        }
+        if (
+            address(musd_) == address(0) || address(stabilityPool_) == address(0) || address(priceFeed_) == address(0)
+                || reviewer_ == address(0)
+        ) revert ZeroAddress();
         musd = musd_;
         stabilityPool = stabilityPool_;
+        priceFeed = priceFeed_;
         reviewer = reviewer_;
         bond = bond_;
         claimCap = claimCap_;
@@ -255,9 +269,18 @@ contract SellarShield is ReentrancyGuard {
     function recordPayment(address payer, address payee, uint256 amount) external returns (uint256 receiptId) {
         if (msg.sender != safe) revert NotSafe();
         receiptId = receipts.length;
+        Status s = cases[payee].status;
         receipts.push(
-            Receipt({payer: payer, payee: payee, amount: uint128(amount), paidAt: uint64(block.timestamp), claimed: false})
+            Receipt({
+                payer: payer,
+                payee: payee,
+                amount: uint128(amount),
+                paidAt: uint64(block.timestamp),
+                claimed: false,
+                warned: s == Status.Flagged || s == Status.Confirmed
+            })
         );
+        _receiptsOf[payer].push(receiptId);
         emit PaymentRecorded(receiptId, payer, payee, amount);
     }
 
@@ -270,7 +293,7 @@ contract SellarShield is ReentrancyGuard {
         if (r.claimed) revert AlreadyClaimed();
         Case storage c = cases[r.payee];
         if (c.status != Status.Confirmed) revert NotConfirmed();
-        if (r.paidAt >= c.firstReportAt) revert PaidAfterReport();
+        if (r.warned || r.paidAt >= c.firstReportAt) revert PaidAfterReport();
         if (uint256(c.resolvedAt) > uint256(r.paidAt) + coverWindow) revert OutsideCoverWindow();
 
         uint256 payout = r.amount;
@@ -294,9 +317,9 @@ contract SellarShield is ReentrancyGuard {
         return fundLiquid() + stabilityPool.getCompoundedMUSDDeposit(address(this));
     }
 
-    /// @notice BTC earned in the Stability Pool: held here and still pending in the pool.
+    /// @notice BTC earned in the Stability Pool: held here (for sale) and still pending in the pool.
     function fundBtc() external view returns (uint256 held, uint256 pending) {
-        return (address(this).balance - btcReserved, stabilityPool.getDepositorCollateralGain(address(this)));
+        return (btcForSale(), stabilityPool.getDepositorCollateralGain(address(this)));
     }
 
     /// @notice Move the fund toward its target split: BUFFER_BPS liquid, the rest in the Stability Pool.
@@ -316,6 +339,50 @@ contract SellarShield is ReentrancyGuard {
 
     function receiptCount() external view returns (uint256) {
         return receipts.length;
+    }
+
+    function receiptCountOf(address payer) external view returns (uint256) {
+        return _receiptsOf[payer].length;
+    }
+
+    /// @notice A payer's receipt ids, newest first, `limit` at a time starting `offset` from the newest.
+    function receiptIdsOf(address payer, uint256 offset, uint256 limit) external view returns (uint256[] memory ids) {
+        uint256[] storage all = _receiptsOf[payer];
+        if (offset >= all.length) return new uint256[](0);
+        uint256 n = all.length - offset;
+        if (n > limit) n = limit;
+        ids = new uint256[](n);
+        for (uint256 i; i < n; i++) {
+            ids[i] = all[all.length - 1 - offset - i];
+        }
+    }
+
+    // ---------------------------------------------------------------- BTC earned by the fund
+
+    /// @notice BTC the fund can sell: what it holds, minus what is set aside for reporters.
+    function btcForSale() public view returns (uint256) {
+        return address(this).balance - btcReserved;
+    }
+
+    /// @notice MUSD needed to buy `btcAmount` of the fund's BTC right now, and the price used.
+    function quoteBtc(uint256 btcAmount) public view returns (uint256 musdCost, uint256 price) {
+        price = priceFeed.fetchPrice();
+        if (price == 0) revert NoPrice();
+        musdCost = (btcAmount * price * (BPS - BTC_DISCOUNT_BPS)) / 1e18 / BPS;
+    }
+
+    /// @notice Buy BTC the fund earned, paying MUSD at Mezo's price feed minus BTC_DISCOUNT_BPS.
+    /// The MUSD goes into the cover fund, where it can pay refunds. Open to anyone.
+    /// @param maxMusd The most MUSD the caller will pay, in case the price moves before this lands.
+    function buyBtc(uint256 btcAmount, uint256 maxMusd) external nonReentrant returns (uint256 musdCost) {
+        if (btcAmount == 0 || btcAmount > btcForSale()) revert NotEnoughBtc();
+        uint256 price;
+        (musdCost, price) = quoteBtc(btcAmount);
+        if (musdCost > maxMusd) revert CostsMoreThanMax();
+        musd.safeTransferFrom(msg.sender, address(this), musdCost);
+        (bool ok,) = msg.sender.call{value: btcAmount}("");
+        if (!ok) revert BtcTransferFailed();
+        emit BtcSold(msg.sender, btcAmount, musdCost, price);
     }
 
     function _ensureLiquid(uint256 amount) internal {

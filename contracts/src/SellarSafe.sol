@@ -77,6 +77,7 @@ contract SellarSafe is ReentrancyGuard {
     mapping(address owner => Account) public accounts;
     mapping(address owner => mapping(address payee => uint64 trustedAt)) public trustedAt;
     Hold[] public holds;
+    mapping(address owner => uint256[]) private _holdsOf;
 
     event Deposited(address indexed owner, address indexed from, uint256 amount);
     event Withdrawn(address indexed owner, uint256 amount);
@@ -197,7 +198,8 @@ contract SellarSafe is ReentrancyGuard {
         if (s == SellarShield.Status.Flagged && !acknowledgeFlag) revert FlaggedSinceHold();
         h.state = HoldState.Paid;
         emit Approved(holdId);
-        _pay(msg.sender, h.to, h.amount);
+        // The owner's own release does not use up the agent's daily allowance.
+        _pay(msg.sender, h.to, h.amount, false);
     }
 
     function reject(uint256 holdId) external {
@@ -230,10 +232,11 @@ contract SellarSafe is ReentrancyGuard {
         uint32 reasons = check(owner, to, amount);
         if (escalate) reasons |= R_AGENT_ESCALATED;
         if (reasons == 0) {
-            _pay(owner, to, amount);
+            _pay(owner, to, amount, true);
             return (true, 0);
         }
         holdId = holds.length;
+        _holdsOf[owner].push(holdId);
         holds.push(
             Hold({
                 owner: owner,
@@ -280,6 +283,22 @@ contract SellarSafe is ReentrancyGuard {
         return holds.length;
     }
 
+    function holdCountOf(address owner) external view returns (uint256) {
+        return _holdsOf[owner].length;
+    }
+
+    /// @notice An owner's hold ids, newest first, `limit` at a time starting `offset` from the newest.
+    function holdIdsOf(address owner, uint256 offset, uint256 limit) external view returns (uint256[] memory ids) {
+        uint256[] storage all = _holdsOf[owner];
+        if (offset >= all.length) return new uint256[](0);
+        uint256 n = all.length - offset;
+        if (n > limit) n = limit;
+        ids = new uint256[](n);
+        for (uint256 i; i < n; i++) {
+            ids[i] = all[all.length - 1 - offset - i];
+        }
+    }
+
     function spentToday(address owner) external view returns (uint256) {
         return _spentToday(accounts[owner]);
     }
@@ -309,18 +328,20 @@ contract SellarSafe is ReentrancyGuard {
         }
     }
 
-    function _pay(address owner, address to, uint256 amount) internal {
+    function _pay(address owner, address to, uint256 amount, bool countsTowardDailyLimit) internal {
         Account storage a = accounts[owner];
         uint256 fee = (amount * feeBps) / BPS;
         if (amount + fee > a.balance) revert InsufficientBalance();
         a.balance -= amount + fee;
 
-        uint64 today = uint64(block.timestamp / 1 days);
-        if (a.day != today) {
-            a.day = today;
-            a.spentToday = 0;
+        if (countsTowardDailyLimit) {
+            uint64 today = uint64(block.timestamp / 1 days);
+            if (a.day != today) {
+                a.day = today;
+                a.spentToday = 0;
+            }
+            a.spentToday += uint128(amount);
         }
-        a.spentToday += uint128(amount);
 
         musd.safeTransfer(to, amount);
         if (fee > 0) musd.safeTransfer(address(shield), fee);

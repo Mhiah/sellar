@@ -33,7 +33,7 @@ contract ForkTest is Test {
         if (vm.envOr("FORK", uint256(0)) != 1) return;
         vm.createSelectFork(vm.rpcUrl("mezo_testnet"));
         forked = true;
-        shield = new SellarShield(MUSD, SP, reviewer, 10e18, 500e18, 30 days, 30 days);
+        shield = new SellarShield(MUSD, SP, PF, reviewer, 10e18, 500e18, 30 days, 30 days);
         safe = new SellarSafe(MUSD, shield, TM, PF, 25, 1 days);
         shield.setSafe(address(safe));
 

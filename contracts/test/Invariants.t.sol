@@ -40,6 +40,9 @@ contract Handler is Test {
         for (uint256 i; i < 5; i++) {
             payees[i] = address(uint160(0x3000 + i));
         }
+        for (uint256 i; i < 4; i++) {
+            vm.deal(owners[i], 0);
+        }
         vm.deal(address(sp), 100 ether);
     }
 
@@ -105,13 +108,21 @@ contract Handler is Test {
         uint256 n = shield.receiptCount();
         if (n == 0) return;
         id %= n;
-        (address payer,,,,) = shield.receipts(id);
+        (address payer,,,,,) = shield.receipts(id);
         vm.prank(payer);
         try shield.claim(id) {} catch {}
     }
 
     function rebalance() external {
         shield.rebalance();
+    }
+
+    function buyBtc(uint256 o, uint256 amount) external {
+        uint256 forSale = shield.btcForSale();
+        if (forSale == 0) return;
+        amount = bound(amount, 1, forSale);
+        vm.prank(owners[o % 4]);
+        try shield.buyBtc(amount, type(uint256).max) {} catch {}
     }
 
     function poolLiquidation(uint256 lossBps, uint256 btc) external {
@@ -148,16 +159,12 @@ contract InvariantsTest is Test {
         address reviewer = makeAddr("reviewer");
         musd = new MockMUSD();
         sp = new MockStabilityPool(IERC20(address(musd)));
+        IPriceFeed feed = IPriceFeed(address(new MockPriceFeed()));
         shield = new SellarShield(
-            IERC20(address(musd)), IStabilityPool(address(sp)), reviewer, 10e18, 500e18, 30 days, 30 days
+            IERC20(address(musd)), IStabilityPool(address(sp)), feed, reviewer, 10e18, 500e18, 30 days, 30 days
         );
         safe = new SellarSafe(
-            IERC20(address(musd)),
-            shield,
-            ITroveManager(address(new MockTroveManager())),
-            IPriceFeed(address(new MockPriceFeed())),
-            25,
-            1 days
+            IERC20(address(musd)), shield, ITroveManager(address(new MockTroveManager())), feed, 25, 1 days
         );
         shield.setSafe(address(safe));
         handler = new Handler(musd, sp, shield, safe, reviewer);

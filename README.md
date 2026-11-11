@@ -115,7 +115,7 @@ python -m pytest guard/tests -q
 Result:
 
 ```
-11 passed
+16 passed
 ```
 
 **4. Play the agent and the owner yourself (2 minutes, one wallet)**
@@ -160,7 +160,7 @@ Both contracts are deployed and source-verified. Every step below is a real tran
 | SellarShield | [`0x799d90D2FA41b9827c345E480BEC635B3EF0c444`](https://explorer.test.mezo.org/address/0x799d90D2FA41b9827c345E480BEC635B3EF0c444) |
 | SellarFaucet (testnet only) | [`0x5630dE2D61947CcCA0fF9D5F6330238c2415AF03`](https://explorer.test.mezo.org/address/0x5630dE2D61947CcCA0fF9D5F6330238c2415AF03) |
 | Source | Verified on Mezo's explorer and on Sourcify |
-| Tests | 61 contract, 5 fork, 11 guard. All run on every push |
+| Tests | 61 contract, 5 fork, 16 guard. All run on every push |
 | Audit | None. Testnet only |
 | Users | Team test wallets only so far. No outside users yet |
 
@@ -210,7 +210,7 @@ rules still hold the payment. The agent's key cannot approve, withdraw or change
 |---|---|
 | **MUSD** | Every balance, limit, bond, fee and refund is in MUSD. |
 | **Stability Pool** | The cover fund keeps 25% liquid and deposits the rest with `provideToSP`, so idle MUSD earns BTC from liquidations. `rebalance()` is open to anyone. |
-| **BTC gains** | BTC earned in the pool stays in the fund. A tenth of it is shared between the reporters of each confirmed case. |
+| **BTC gains** | BTC earned in the pool stays in the fund. A tenth of it is shared between the reporters of each confirmed case. The rest cannot be spent yet (see Honest limits). |
 | **TroveManager + PriceFeed** | An owner can set a floor on their own Mezo loan. While its collateral ratio is below the floor, agent payments are held. If Mezo's contracts cannot be read, the payment is held too. |
 | **BorrowerOperations** | The live run opens a real loan to fund the demo and to exercise the loan check. |
 
@@ -246,6 +246,16 @@ Mezo's contract addresses come from the official `@mezo-org/musd-contracts` pack
 - **Stability Pool risk.** Deposits there can shrink in liquidations, and withdrawals pause while
   any loan on Mezo is under-collateralised. Refunds are capped, and a claim may have to wait.
 - **Refunds are partial by design.** At most 500 MUSD, and at most 20% of the fund.
+- **The fund's BTC cannot pay refunds yet.** Refunds are paid in MUSD only. BTC the fund earns in the
+  Stability Pool stays in the contract: a tenth goes to reporters and nothing can spend the rest.
+  The pool also turns part of a deposit into BTC during liquidations, so the MUSD available for
+  refunds can go down. The next version needs a way to turn that BTC back into MUSD.
+- **Releases count toward the daily limit.** A payment the owner releases uses up part of the
+  agent's daily allowance for that day.
+- **The dashboard reads the newest 200 holds and receipts** across all safes. Under heavy use,
+  older ones would stop showing there, though they stay on-chain.
+- **"More than you asked" needs an amount the guard can read**: "5 MUSD", "$5", "5 dollars", or a
+  number after pay or send. An amount written out in words is not caught.
 - **The guard forgets.** It remembers what you typed and what the agent read for one conversation.
   After a restart, addresses from earlier content count as unknown, so the safe still holds them.
 - **The Hermes adapter is not proven inside Hermes.** It is tested against a stand-in.

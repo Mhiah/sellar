@@ -75,6 +75,9 @@ def _on_post_tool_call(tool_name: str = "", result: Any = "", **kwargs: Any):
 
 
 def tool_pay(args: dict, **kwargs: Any) -> str:
+    if "SELLAR_OWNER" not in os.environ and _cid(kwargs) not in _WALLETS:
+        return json.dumps({"status": "refused", "message": "Sellar is not set up: SELLAR_OWNER and SELLAR_AGENT_KEY "
+                                                           "are missing. Nothing was paid."})
     r = _wallet(kwargs).pay(str(args.get("to", "")), float(args.get("amount") or 0), str(args.get("memo", "")))
     return json.dumps({"status": r.status, "message": r.message, "hold_id": r.hold_id, "transaction": r.url})
 

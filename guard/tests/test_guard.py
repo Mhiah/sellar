@@ -92,6 +92,54 @@ def test_memo_tells_the_dashboard_what_the_guard_saw(wallet):
     assert len(wallet.client.memos[-1]) == 32
 
 
+def test_amounts_without_a_token_name_still_count_as_musd(wallet):
+    for said in ["pay Ade 5", "send Ade $5 please", "pay Ade 5 dollars for the logo", "give Ade 5 bucks"]:
+        w = GuardedWallet(FakeSafe([ADE]), {"Ade": ADE})
+        w.note_user(said)
+        r = w.pay(ADE, 12)
+        assert r.escalated and "You asked for 5 MUSD" in r.message, said
+        assert not w.pay(ADE, 5).escalated, said
+
+
+def test_an_invoice_number_is_not_mistaken_for_an_amount(wallet):
+    from guard.sellar_guard.wallet import amounts_in
+    assert amounts_in("pay invoice 4471") == []
+    assert amounts_in("pay invoice #4471 to Ade, 20 MUSD") == [20.0]
+    assert amounts_in("pay Ade 5 for invoice 4471") == [5.0]
+    assert amounts_in("what is 2 + 2") == []
+    assert amounts_in("pay Ade in 3 days") == []
+    assert amounts_in("send Ade 10 USDC") == []
+    assert amounts_in("pay Ade 1,250.50") == [1250.5]
+
+
+def test_the_latest_request_sets_the_amount_not_an_older_larger_one(wallet):
+    wallet.note_user("pay Ade 50 MUSD")
+    assert wallet.pay(ADE, 50).status == "paid"
+    wallet.note_user("thanks. now pay Ade 5 MUSD")
+    r = wallet.pay(ADE, 45)
+    assert r.escalated and "You asked for 5 MUSD" in r.message
+    wallet.note_user("ok go ahead")                      # no amount: the last asked amount still stands
+    assert wallet.pay(ADE, 45).escalated
+
+
+def test_a_refusal_from_the_safe_is_reported_not_raised():
+    class Frozen(FakeSafe):
+        def request(self, *a, **k):
+            raise RuntimeError("eth_estimateGas: execution reverted: AccountFrozen")
+    w = GuardedWallet(Frozen([ADE]), {"Ade": ADE})
+    w.note_user("pay Ade 5 MUSD")
+    r = w.pay(ADE, 5)
+    assert r.status == "refused" and "frozen" in r.message and "Nothing was paid" in r.message
+
+
+def test_a_plain_reference_never_looks_like_a_guard_memo():
+    from guard.sellar_guard.wallet import build_memo, MEMO_MARKER
+    import itertools
+    for i in itertools.islice(itertools.count(), 3000):
+        assert build_memo(f"ref-{i}", [])[:2] != MEMO_MARKER
+    assert build_memo("", []) == b"\0" * 32
+
+
 def test_bad_input_is_refused_without_touching_the_chain(wallet):
     assert wallet.pay("not-an-address", 5).status == "refused"
     assert wallet.pay(ADE, 0).status == "refused"

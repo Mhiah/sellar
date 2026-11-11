@@ -10,6 +10,7 @@ list and the owner's Mezo loan. If the guard were bypassed or fooled, those stil
 """
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass, field
 from typing import Optional
 
@@ -36,7 +37,10 @@ def build_memo(reference: str, found: list[Reason]) -> bytes:
     for r in found:
         flags |= MEMO_FLAGS.get(r.code, 0)
     if not flags:
-        return digest if reference else b"\0" * 32
+        if not reference:
+            return b"\0" * 32
+        # A plain reference hash must never look like a guard memo.
+        return (bytes([digest[0] ^ 0xFF]) + digest[1:]) if digest[:2] == MEMO_MARKER else digest
     return MEMO_MARKER + bytes([flags]) + digest[3:]
 
 
@@ -52,11 +56,48 @@ class PayResult:
     escalated: bool = False
 
 
+# This wallet only pays MUSD, so an amount the user gives without a token name still means MUSD.
+_TOKEN_AMOUNT = re.compile(r"(\d[\d,]*(?:\.\d+)?)\s*MUSD\b", re.I)
+_DOLLAR_AMOUNT = re.compile(r"\$\s?(\d[\d,]*(?:\.\d+)?)|(\d[\d,]*(?:\.\d+)?)\s*(?:dollars?|bucks|usd)\b", re.I)
+_VERB = re.compile(r"\b(?:pay|send|transfer|give|tip)\b", re.I)
+_NUMBER = re.compile(r"(?<![#\w.])(\d[\d,]*(?:\.\d+)?)(?![\w.])")
+_REFERENCE = re.compile(r"(?:invoice|order|ref(?:erence)?|no\.?|number|#)\s*#?\s*$", re.I)
+# A number followed by one of these is a count or a different token, not an amount of MUSD.
+_NOT_MONEY = re.compile(r"\s*(?:%|days?|hours?|hrs?|minutes?|mins?|weeks?|months?|years?|times|people|items?|[A-Z]{2,6}\b)")
+
+
+def amounts_in(text: str) -> list[float]:
+    """MUSD amounts a user message asks for: '5 MUSD', '$5', '5 dollars', or a bare number after pay/send."""
+    text = text or ""
+    found: list[float] = []
+
+    def add(raw: str) -> None:
+        try:
+            found.append(float(raw.replace(",", "")))
+        except ValueError:
+            pass
+
+    for m in _TOKEN_AMOUNT.finditer(text):
+        add(m.group(1))
+    for m in _DOLLAR_AMOUNT.finditer(text):
+        add(m.group(1) or m.group(2))
+    if not found:
+        for verb in _VERB.finditer(text):
+            sentence = re.split(r"\.(?!\d)|\n", text[verb.end():verb.end() + 80])[0]
+            for m in _NUMBER.finditer(sentence):
+                if _REFERENCE.search(sentence[:m.start()]) or _NOT_MONEY.match(sentence[m.end():]):
+                    continue      # "invoice 4471", "in 3 days", "10 USDC"
+                add(m.group(1))
+                break
+    return found
+
+
 class GuardedWallet:
     def __init__(self, client: SellarClient, payees: Optional[dict[str, str]] = None, session: str = "default"):
         self.client = client
         self.session = session
         self.prov = Provenance()
+        self._asked: list[float] = []      # amounts in the most recent user message that named any
         # The guard's own copy of the owner's payee names, used to spot "you said Ade, this is not Ade".
         self.store = Store(memory=True)
         self.store.set_setting("hold_new_payees", False)   # new payees are SellarSafe's call, on-chain
@@ -67,6 +108,9 @@ class GuardedWallet:
     def note_user(self, text: str) -> None:
         """Something the human typed."""
         self.prov.note_user(self.session, text or "", list(self.store.payees()))
+        latest = amounts_in(text or "")
+        if latest:
+            self._asked = latest
 
     def note_content(self, text: str) -> None:
         """Something the agent only read: an email, a web page, a file, a tool result."""
@@ -76,7 +120,11 @@ class GuardedWallet:
     def screen(self, to: str, amount: float) -> list[Reason]:
         act = MoneyAction(tool="sellar_pay", kind="transfer", recipients=[chain.norm(to)], amount=float(amount),
                           token="MUSD")
-        reasons = assess(act, self.store, self.prov.view(self.session))
+        # "More than you asked" is judged against the latest message that named an amount, not against
+        # every amount ever mentioned in the conversation.
+        view = dict(self.prov.view(self.session))
+        view["amounts"] = [(a, "MUSD") for a in self._asked]
+        reasons = assess(act, self.store, view)
         # "unknown" (never mentioned anywhere) is also something only the guard can know.
         return [r for r in reasons if r.code in ESCALATE_CODES or r.code == "unknown"]
 
@@ -90,7 +138,15 @@ class GuardedWallet:
         escalate = any(r.code in ESCALATE_CODES or r.severity == CRITICAL for r in found)
         guard_reasons = [r.text for r in found]
 
-        out = self.client.request(to, to_units(amount), build_memo(memo, found), escalate)
+        try:
+            out = self.client.request(to, to_units(amount), build_memo(memo, found), escalate)
+        except Exception as exc:   # the safe refused the request outright, or the node could not be reached
+            text = str(exc)
+            why = ("the owner has frozen the agent" if "AccountFrozen" in text or "0x552afea0" in text
+                   else "this key is not the agent for that safe" if "NotAgent" in text or "0x0d9ab13f" in text
+                   else text[:200])
+            return PayResult("refused", f"SellarSafe did not accept the request: {why}. Nothing was paid. Tell the user.",
+                             guard_reasons=guard_reasons, escalated=escalate)
         chain_reasons = describe(out["reasons"])
         common = dict(guard_reasons=guard_reasons, chain_reasons=chain_reasons, tx=out["tx"], url=out["url"],
                       escalated=escalate)

@@ -312,8 +312,9 @@ async function renderWaiting(holds) {
   $("holds-empty-text").textContent = account.agent === addr(0n)
     ? "You have not set up an agent yet. Add MUSD below, then name your agent's key under Rules."
     : "Nothing is waiting. Your agent is within your rules. Payments outside them will show up here for you to release or reject.";
-  for (const h of pending) {
-    const flag = await flagOf(h.to);
+  const flags = await Promise.all(pending.map((h) => flagOf(h.to)));
+  for (const [i, h] of pending.entries()) {
+    const flag = flags[i];
     const lines = reasonsFor(h).map((t) => [t, ""]);
     const acts = [];
     if (flag.status === 2) {
@@ -358,9 +359,10 @@ async function renderPayees(seen) {
   } catch (e) { /* the node may refuse wide log searches; saved names still show */ }
   const box = $("payee-list");
   box.replaceChildren();
-  for (const a of found.keys()) {
-    if (!isAddr(a)) continue;
-    const [since] = await call(NET.safe, enc(SIG.trustedAt, me, a));
+  const candidates = [...found.keys()].filter(isAddr);
+  const sinces = await Promise.all(candidates.map((a) => call(NET.safe, enc(SIG.trustedAt, me, a))));
+  for (const [i, a] of candidates.entries()) {
+    const since = sinces[i][0];
     if (since === 0n) continue;
     const row = el("div", "item");
     const title = el("div", "amt", nameOf(a) || short(a));
@@ -393,13 +395,14 @@ async function renderActivity(holds, receipts) {
     const expired = h.state === 1 && now > h.at + holdTtl;
     rows.push({ at: h.at, node: item(fmt(h.amount) + " MUSD", h.to, [["Asked " + when(h.at), "meta"]], [], expired ? ["Expired, not paid", ""] : STATE[h.state]) });
   }
-  for (const r of receipts) {
+  const cases = await Promise.all(receipts.map((r) => (r.claimed ? null : call(NET.shield, enc(SIG.cases, r.to)))));
+  for (const [i, r] of receipts.entries()) {
     const lines = [["Paid " + when(r.at), "meta"]];
     const acts = [];
     let status = ["Paid", "ok"];
     if (r.claimed) status = ["Paid, then refunded", "ok"];
     else {
-      const c = await call(NET.shield, enc(SIG.cases, r.to));
+      const c = cases[i];
       if (Number(c[0]) === 2 && r.at < c[3]) {
         lines.unshift(["This address was later confirmed as a scam. You can claim a refund.", "warn"]);
         acts.push(button("Claim refund", "primary", () => act("Claim", () => send(NET.shield, enc(SIG.claim, r.id), "Claim refund"))));
@@ -558,8 +561,10 @@ $("rules-form").addEventListener("submit", (e) => {
     const agent = $("r-agent").value.trim();
     if (!isAddr(agent)) throw new Error("The agent key should be an address starting with 0x.");
     if (!/^\d+$/.test($("r-cool").value.trim())) throw new Error("Enter the wait in whole minutes.");
-    const data = enc(SIG.configure, agent, toUnits($("r-per").value), toUnits($("r-day").value),
-      BigInt($("r-cool").value.trim()) * 60n, toUnits($("r-icr").value) / 100n);
+    const per = toUnits($("r-per").value), day = toUnits($("r-day").value), wait = BigInt($("r-cool").value.trim()) * 60n;
+    if (per >= 2n ** 128n || day >= 2n ** 128n) throw new Error("That limit is too large.");
+    if (wait >= 2n ** 64n) throw new Error("That wait is too long.");
+    const data = enc(SIG.configure, agent, per, day, wait, toUnits($("r-icr").value) / 100n);
     await send(NET.safe, data, "Save rules");
   });
 });

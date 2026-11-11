@@ -23,6 +23,7 @@
       <button data-tab="rules"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 7h9M18 7h1M5 12h2M11 12h8M5 17h9M18 17h1"/><circle cx="16" cy="7" r="2"/><circle cx="9" cy="12" r="2"/><circle cx="16" cy="17" r="2"/></svg>Rules</button>
       <button data-tab="scams"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4 3.5 19h17L12 4z"/><path d="M12 10v4.5M12 16.8v.2"/></svg>Scam list</button>
       <button data-tab="activity"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 7h12M6 12h12M6 17h8"/></svg>Activity</button>
+      <button data-tab="tryit"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.500v13l10.500-6.500L8 5.500z"/></svg>Try it</button>
     </nav>
     <div class="side-foot">
       <p class="net"><span class="dot"></span>Mezo Testnet</p>
@@ -161,6 +162,43 @@
           <div class="rows" id="activity-list"></div>
           <div class="empty" id="activity-empty"><p>Connect your wallet to see your payments.</p></div>
         </div>
+      </section>
+
+      <section id="tryit" hidden>
+        <h1 class="page">Try Sellar in two minutes</h1>
+        <p class="lede">You play both sides with one wallet: the owner, and the AI agent that asks to pay. Everything here is test money on Mezo testnet.</p>
+        <ol class="steps">
+          <li class="card panel step" id="t1">
+            <div class="panel-head"><span class="num">1</span><h2>Get test BTC for network fees</h2><span class="status" id="t1-s"></span></div>
+            <p class="hint">Mezo's faucet sends test BTC to your address. It is free and has no real value.</p>
+            <div class="row"><a class="btn" href="https://faucet.test.mezo.org/" target="_blank" rel="noopener">Open Mezo's faucet</a><button class="btn" id="t1-check" type="button">I have it, check again</button></div>
+          </li>
+          <li class="card panel step" id="t2">
+            <div class="panel-head"><span class="num">2</span><h2>Get 25 test MUSD in your safe</h2><span class="status" id="t2-s"></span></div>
+            <p class="hint" id="t2-hint">Sellar's test faucet puts 25 MUSD straight into your safe. Once per address.</p>
+            <div class="row"><button class="btn primary" id="t2-go" type="button">Get test MUSD</button></div>
+          </li>
+          <li class="card panel step" id="t3">
+            <div class="panel-head"><span class="num">3</span><h2>Let this wallet act as your agent</h2><span class="status" id="t3-s"></span></div>
+            <p class="hint" id="t3-hint">Normally the agent has its own key. For this test your wallet plays the agent too, with a limit of 10 MUSD per payment and 20 per day.</p>
+            <div class="row"><button class="btn primary" id="t3-go" type="button">Use this wallet as the agent</button></div>
+          </li>
+          <li class="card panel step" id="t4">
+            <div class="panel-head"><span class="num">4</span><h2>Now act as the agent</h2><span class="status" id="t4-s"></span></div>
+            <p class="hint">Ask the safe to pay 5 MUSD. Both payments below go to a new address you have never trusted, so the safe will hold them.</p>
+            <div class="row">
+              <button class="btn primary" id="t4-stranger" type="button">Pay a stranger</button>
+              <button class="btn primary" id="t4-invoice" type="button">Pay the address from a fake invoice email</button>
+            </div>
+            <p class="hint">The second one also carries what the guard would report: the address came from an email, not from you.</p>
+          </li>
+          <li class="card panel step" id="t5">
+            <div class="panel-head"><span class="num">5</span><h2>Decide as the owner</h2><span class="status" id="t5-s"></span></div>
+            <p class="hint">Held payments are waiting for you. Release or reject them.</p>
+            <div class="row"><button class="btn primary" id="t5-go" type="button">Go to Waiting</button></div>
+          </li>
+        </ol>
+        <p class="hint" id="try-connect">Connect your wallet to start.</p>
       </section>
 
       <div id="status" role="status" hidden></div>

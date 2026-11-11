@@ -49,6 +49,7 @@ knows you asked for 5, so the payment waits for you
 | Rules | Name the agent key, set the limits and the loan floor, freeze the agent. |
 | Scam list | Check any address. Report one. Take a bond back. |
 | Activity | Every payment your agent asked for, and any refund you can claim. |
+| Try it | Five guided steps to test Sellar yourself with test money. |
 
 ## Try it in 2 minutes
 
@@ -88,7 +89,9 @@ Ran 27 tests for test/SellarSafe.t.sol:SellarSafeTest
 Suite result: ok. 27 passed; 0 failed; 0 skipped
 Ran 4 tests for test/Invariants.t.sol:InvariantsTest
 Suite result: ok. 4 passed; 0 failed; 0 skipped
-Ran 4 test suites: 57 tests passed, 0 failed, 5 skipped (62 total tests)
+Ran 4 tests for test/SellarFaucet.t.sol:SellarFaucetTest
+Suite result: ok. 4 passed; 0 failed; 0 skipped
+Ran 5 test suites: 61 tests passed, 0 failed, 5 skipped (66 total tests)
 ```
 
 The 5 skipped tests are the ones that need Mezo's network. Run them against a fork of Mezo
@@ -111,12 +114,20 @@ Result:
 11 passed
 ```
 
-**4. Use it with your own wallet**
+**4. Play the agent and the owner yourself (2 minutes, one wallet)**
 
-Connect a wallet on Mezo testnet at [the dashboard](https://mhiah.github.io/sellar/). You need a
-little test BTC from [Mezo's faucet](https://faucet.test.mezo.org/) for fees and some test MUSD to
-deposit. From there you can deposit, set rules, trust payees, report an address and release or
-reject held payments.
+Open [the dashboard](https://mhiah.github.io/sellar/), connect a wallet and choose **Try it**. The
+page walks you through five steps and ticks each one off from what is on-chain:
+
+1. Get test BTC for fees from [Mezo's faucet](https://faucet.test.mezo.org/).
+2. Get 25 test MUSD straight into your safe from Sellar's faucet. No Mezo loan needed.
+3. Let your wallet act as the agent, with a 10 MUSD limit per payment.
+4. Act as the agent: **Pay a stranger**, or **Pay the address from a fake invoice email**.
+5. Act as the owner: open **Waiting** and release or reject what was held.
+
+Result: both payments are held and nothing leaves your safe until you release it. The fake-invoice
+one shows the reason "This address came from something your agent read, not from you." On that
+button the page plays the guard for you, since there is no real agent reading a real email.
 
 ## Results: what ran live on Mezo testnet
 
@@ -141,8 +152,9 @@ Both contracts are deployed and source-verified. Every step below is a real tran
 | Network | Mezo testnet (chain 31611) |
 | SellarSafe | [`0x9bf0180a21fFfB35b815Bf0B264706E72e0a26Aa`](https://explorer.test.mezo.org/address/0x9bf0180a21fFfB35b815Bf0B264706E72e0a26Aa) |
 | SellarShield | [`0x799d90D2FA41b9827c345E480BEC635B3EF0c444`](https://explorer.test.mezo.org/address/0x799d90D2FA41b9827c345E480BEC635B3EF0c444) |
+| SellarFaucet (testnet only) | [`0x5630dE2D61947CcCA0fF9D5F6330238c2415AF03`](https://explorer.test.mezo.org/address/0x5630dE2D61947CcCA0fF9D5F6330238c2415AF03) |
 | Source | Verified on Mezo's explorer and on Sourcify |
-| Tests | 57 contract, 5 fork, 11 guard. All run on every push |
+| Tests | 61 contract, 5 fork, 11 guard. All run on every push |
 | Audit | None. Testnet only |
 | Users | Team test wallets only so far. No outside users yet |
 
@@ -315,6 +327,7 @@ The agent key is the only key the guard holds, and that key can only ask to pay.
 | `contracts/test/SellarShield.t.sol` | Bonds, confirm, dismiss, timeouts, every claim rule and cap, a paused pool, a pool that loses deposits, a pool wiped to zero. Fuzzed. |
 | `contracts/test/Invariants.t.sol` | Random owners, agents, reporters and pool behaviour. The safe always holds what owners are owed, bonds are always there, and no payment ever leaves unattended against the rules. |
 | `contracts/test/Fork.t.sol` | Pay, hold, report, confirm, refund and the Stability Pool deposit against Mezo's real testnet contracts. |
+| `contracts/test/SellarFaucet.t.sol` | One drip per address, an empty faucet, and the whole try-it path with one wallet. |
 | `guard/tests/test_guard.py` | The guard's decisions, the transaction encoding and the Hermes adapter. |
 
 </details>
@@ -325,6 +338,7 @@ The agent key is the only key the guard holds, and that key can only ask to pay.
 ```
 contracts/src/SellarSafe.sol      the safe
 contracts/src/SellarShield.sol    the scam list and the cover fund
+contracts/src/SellarFaucet.sol    testnet faucet: 25 test MUSD per address, into its safe
 contracts/test/                   unit, fuzz, invariant and fork tests
 contracts/script/Deploy.s.sol     deployment against Mezo's contracts
 guard/                            the guard, the Mezo client and the Hermes adapter

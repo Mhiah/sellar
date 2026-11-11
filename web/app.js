@@ -21,7 +21,7 @@ const SIG = {
   report: "0xcaf2cbc5", fundAssets: "0x3c93b9f2", receiptCount: "0x7f038f3c", receipts: "0x0f7ee1ec",
   claim: "0x379607f5", withdrawBond: "0x7529d9df", cases: "0x2dfe4226", hasReported: "0x202e053d",
   balanceOf: "0x70a08231", allowance: "0xdd62ed3e", approve: "0x095ea7b3",
-  request: "0x233e7c48", drip: "0x9f678cca", claimed: "0xc884ef83", remaining: "0x55234ec0",
+  feeBps: "0x24a9d853", request: "0x233e7c48", drip: "0x9f678cca", claimed: "0xc884ef83", remaining: "0x55234ec0",
 };
 const TOPIC_TRUSTED = "0x85825a10f1ed53996ee005fa260432333e88823a0cfed7324f257f7f4d4df244";
 const BOND = 10n * 10n ** 18n;
@@ -46,7 +46,7 @@ const GUARD = [
 ];
 
 const $ = (id) => document.getElementById(id);
-let provider = null, me = null, account = null, holdTtl = 86400n;
+let provider = null, me = null, account = null, holdTtl = 86400n, feeBps = 25n;
 // Read-only view of any safe, with no wallet: add ?view=0x… to the address. Nothing can be sent.
 const VIEW = (() => { const v = new URLSearchParams(location.search).get("view"); return isAddrText(v) ? v : null; })();
 function isAddrText(s) { return /^0x[0-9a-fA-F]{40}$/.test(s || ""); }
@@ -79,8 +79,8 @@ function fmt(units, places = 2) {
 
 // ---------------------------------------------------------------- chain access
 
+// Reads always go straight to Mezo's node, whatever network the wallet is on. The wallet only signs.
 async function rpc(method, params) {
-  if (provider && me) return provider.request({ method, params });
   const res = await fetch(NET.rpc, {
     method: "POST", headers: { "content-type": "application/json" },
     body: JSON.stringify({ jsonrpc: "2.0", id: 1, method, params }),
@@ -108,15 +108,35 @@ function explain(e) {
   return m.length > 180 ? m.slice(0, 180) + "…" : m;
 }
 
+async function onMezo() {
+  const id = await provider.request({ method: "eth_chainId" });
+  if (BigInt(id) === BigInt(NET.chainId)) return;
+  try {
+    await provider.request({ method: "wallet_switchEthereumChain", params: [{ chainId: NET.chainId }] });
+  } catch (e) {
+    if (e && e.code === 4001) throw new Error("Your wallet needs to be on Mezo Testnet for this.");
+    await provider.request({
+      method: "wallet_addEthereumChain",
+      params: [{
+        chainId: NET.chainId, chainName: NET.name, rpcUrls: [NET.rpc], blockExplorerUrls: [NET.explorer],
+        nativeCurrency: { name: "Bitcoin", symbol: "BTC", decimals: 18 },
+      }],
+    });
+  }
+}
+
 async function send(to, data, label) {
+  await onMezo();
   say(label + ": confirm it in your wallet.");
   const hash = await provider.request({ method: "eth_sendTransaction", params: [{ from: me, to, data }] });
   const url = NET.explorer + "/tx/" + hash;
   say(label + ": waiting for the network.", url);
   for (let i = 0; i < 90; i++) {
-    const r = await provider.request({ method: "eth_getTransactionReceipt", params: [hash] });
+    let r = null;
+    // Mezo's node can error on a receipt lookup before the transaction is indexed. Keep waiting.
+    try { r = await rpc("eth_getTransactionReceipt", [hash]); } catch (e) { r = null; }
     if (r) {
-      if (BigInt(r.status) !== 1n) throw new Error("The network rejected it.");
+      if (r.status != null && BigInt(r.status) !== 1n) throw new Error("The network rejected it.");
       say(label + ": done.", url);
       return r;
     }
@@ -125,8 +145,12 @@ async function send(to, data, label) {
   throw new Error("Still waiting after three minutes. Check the transaction link.");
 }
 
+// One action at a time, so a double click cannot send the same transaction twice.
+let busy = false;
 async function act(label, fn) {
-  try { await fn(); await refresh(); } catch (e) { say(label + " did not go through. " + explain(e)); }
+  if (busy) { say("Still working on the previous step. Finish it in your wallet first."); return; }
+  busy = true;
+  try { await fn(); await refresh(); } catch (e) { say(label + " did not go through. " + explain(e)); } finally { busy = false; }
 }
 
 async function ensureAllowance(spender, amount) {
@@ -136,6 +160,23 @@ async function ensureAllowance(spender, amount) {
 
 // ---------------------------------------------------------------- wallet
 
+function remember(on) { try { on ? localStorage.setItem("sellar.connected", "1") : localStorage.removeItem("sellar.connected"); } catch (e) {} }
+function remembered() { try { return localStorage.getItem("sellar.connected") === "1"; } catch (e) { return false; } }
+
+let listening = false;
+function useAccount(address) {
+  me = address;
+  for (const b of document.querySelectorAll(".js-connect")) b.hidden = true;
+  $("who").hidden = false;
+  $("who").textContent = short(me);
+  $("disconnect").hidden = false;
+  if (!listening && provider.on) {
+    listening = true;
+    provider.on("accountsChanged", () => location.reload());
+    provider.on("chainChanged", () => location.reload());
+  }
+}
+
 async function connect() {
   if (!window.ethereum) {
     say("No wallet found. Open this page in a browser with MetaMask or another Ethereum wallet.");
@@ -144,28 +185,36 @@ async function connect() {
   provider = window.ethereum;
   try {
     const accounts = await provider.request({ method: "eth_requestAccounts" });
-    try {
-      await provider.request({ method: "wallet_switchEthereumChain", params: [{ chainId: NET.chainId }] });
-    } catch (e) {
-      await provider.request({
-        method: "wallet_addEthereumChain",
-        params: [{
-          chainId: NET.chainId, chainName: NET.name, rpcUrls: [NET.rpc], blockExplorerUrls: [NET.explorer],
-          nativeCurrency: { name: "Bitcoin", symbol: "BTC", decimals: 18 },
-        }],
-      });
-    }
-    me = accounts[0];
-    for (const b of document.querySelectorAll(".js-connect")) b.hidden = true;
-    $("who").hidden = false;
-    $("who").textContent = short(me);
+    if (!accounts || !accounts.length) throw new Error("Your wallet did not share an account.");
+    await onMezo();
+    useAccount(accounts[0]);
+    remember(true);
     say("");
-    provider.on && provider.on("accountsChanged", () => location.reload());
-    provider.on && provider.on("chainChanged", () => location.reload());
     await refresh();
   } catch (e) {
+    if (!me || VIEW === me) provider = null;
     say("Could not connect. " + explain(e));
   }
+}
+
+// After a reload, pick the wallet up again without a pop-up, if it was connected and still allows this site.
+async function reconnect() {
+  if (!window.ethereum || !remembered()) return false;
+  try {
+    const accounts = await window.ethereum.request({ method: "eth_accounts" });
+    if (!accounts || !accounts.length) { remember(false); return false; }
+    provider = window.ethereum;
+    useAccount(accounts[0]);
+    return true;
+  } catch (e) { return false; }
+}
+
+async function disconnect() {
+  const p = provider;
+  remember(false);
+  // Ask the wallet to forget this site too. Not every wallet supports it; the page forgets either way.
+  try { if (p) await p.request({ method: "wallet_revokePermissions", params: [{ eth_accounts: {} }] }); } catch (e) {}
+  location.href = location.pathname;
 }
 
 // ---------------------------------------------------------------- reads
@@ -177,25 +226,23 @@ async function loadAccount() {
     balance: w[7], minIcr: w[8],
   };
 }
+// The newest 200 ids, newest first. Holds and receipts are shared lists across every safe.
+function newest(count) {
+  const out = [];
+  for (let i = count - 1n; i >= 0n && out.length < 200; i--) out.push(i);
+  return out;
+}
 async function loadHolds() {
   const [n] = await call(NET.safe, SIG.holdCount);
-  const out = [];
-  for (let i = n - 1n; i >= 0n && out.length < 60; i--) {
-    const w = await call(NET.safe, enc(SIG.holds, i));
-    if (addr(w[0]).toLowerCase() !== me.toLowerCase()) continue;
-    out.push({ id: i, to: addr(w[1]), amount: w[2], at: w[3], reasons: Number(w[4]), state: Number(w[5]), memo: pad(w[6].toString(16)) });
-  }
-  return out;
+  const rows = await Promise.all(newest(n).map(async (i) => [i, await call(NET.safe, enc(SIG.holds, i))]));
+  return rows.filter(([, w]) => addr(w[0]).toLowerCase() === me.toLowerCase()).map(([i, w]) =>
+    ({ id: i, to: addr(w[1]), amount: w[2], at: w[3], reasons: Number(w[4]), state: Number(w[5]), memo: pad(w[6].toString(16)) }));
 }
 async function loadReceipts() {
   const [n] = await call(NET.shield, SIG.receiptCount);
-  const out = [];
-  for (let i = n - 1n; i >= 0n && out.length < 60; i--) {
-    const w = await call(NET.shield, enc(SIG.receipts, i));
-    if (addr(w[0]).toLowerCase() !== me.toLowerCase()) continue;
-    out.push({ id: i, to: addr(w[1]), amount: w[2], at: w[3], claimed: w[4] === 1n });
-  }
-  return out;
+  const rows = await Promise.all(newest(n).map(async (i) => [i, await call(NET.shield, enc(SIG.receipts, i))]));
+  return rows.filter(([, w]) => addr(w[0]).toLowerCase() === me.toLowerCase()).map(([i, w]) =>
+    ({ id: i, to: addr(w[1]), amount: w[2], at: w[3], claimed: w[4] === 1n }));
 }
 const flagOf = async (a) => { const w = await call(NET.shield, enc(SIG.flagInfo, a)); return { status: Number(w[0]), reporters: Number(w[1]) }; };
 
@@ -273,8 +320,15 @@ async function renderWaiting(holds) {
       lines.unshift(["A reviewer confirmed this address as a scam. It cannot be released.", "warn"]);
     } else {
       if (flag.status === 1 && !(h.reasons & 16)) lines.unshift(["This address was reported as a scam after your agent asked.", "warn"]);
-      acts.push(button(flag.status === 1 ? "Release anyway" : "Release", "primary", () =>
-        act("Release", () => send(NET.safe, enc(SIG.approveHold, h.id, flag.status === 1), "Release payment"))));
+      const release = button(flag.status === 1 ? "Release anyway" : "Release", "primary", () =>
+        act("Release", () => send(NET.safe, enc(SIG.approveHold, h.id, flag.status === 1), "Release payment")));
+      const fee = (h.amount * feeBps) / 10000n;
+      if (account.balance < h.amount + fee) {
+        lines.unshift(["Your safe holds " + fmt(account.balance) + " MUSD, which is not enough to release this. Add MUSD below first.", "warn"]);
+        release.disabled = true;
+      }
+      if (account.frozen) release.disabled = true;
+      acts.push(release);
     }
     acts.push(button("Reject", "danger", () => act("Reject", () => send(NET.safe, enc(SIG.reject, h.id), "Reject"))));
     if (account.frozen) lines.unshift(["Your agent is frozen. Unfreeze under Rules to release payments.", "warn"]);
@@ -334,7 +388,11 @@ function renderRules() {
 async function renderActivity(holds, receipts) {
   const rows = [];
   const STATE = { 1: ["Waiting for you", "wait"], 3: ["Rejected by you", "bad"] };
-  for (const h of holds) rows.push({ at: h.at, node: item(fmt(h.amount) + " MUSD", h.to, [["Asked " + when(h.at), "meta"]], [], STATE[h.state]) });
+  const now = BigInt(Math.floor(Date.now() / 1000));
+  for (const h of holds) {
+    const expired = h.state === 1 && now > h.at + holdTtl;
+    rows.push({ at: h.at, node: item(fmt(h.amount) + " MUSD", h.to, [["Asked " + when(h.at), "meta"]], [], expired ? ["Expired, not paid", ""] : STATE[h.state]) });
+  }
   for (const r of receipts) {
     const lines = [["Paid " + when(r.at), "meta"]];
     const acts = [];
@@ -415,6 +473,7 @@ async function refresh() {
   try {
     account = await loadAccount();
     [holdTtl] = await call(NET.safe, SIG.holdTtl);
+    [feeBps] = await call(NET.safe, SIG.feeBps);
     const lh = await call(NET.safe, enc(SIG.loanHealth, me)).catch(() => [0n, 0n]);
     const [walletMusd] = await call(NET.musd, enc(SIG.balanceOf, me));
     const holds = await loadHolds();
@@ -464,8 +523,16 @@ $("money-form").addEventListener("submit", (e) => {
   const kind = e.submitter && e.submitter.value;
   act(kind === "withdraw" ? "Withdraw" : "Deposit", async () => {
     const amount = toUnits($("money-amt").value);
-    if (kind === "withdraw") await send(NET.safe, enc(SIG.withdraw, amount), "Withdraw");
-    else { await ensureAllowance(NET.safe, amount); await send(NET.safe, enc(SIG.deposit, me, amount), "Deposit"); }
+    if (amount === 0n) throw new Error("Enter an amount above zero.");
+    if (kind === "withdraw") {
+      if (amount > account.balance) throw new Error("Your safe holds " + fmt(account.balance) + " MUSD.");
+      await send(NET.safe, enc(SIG.withdraw, amount), "Withdraw");
+    } else {
+      const [have] = await call(NET.musd, enc(SIG.balanceOf, me));
+      if (amount > have) throw new Error("Your wallet holds " + fmt(have) + " MUSD.");
+      await ensureAllowance(NET.safe, amount);
+      await send(NET.safe, enc(SIG.deposit, me, amount), "Deposit");
+    }
     $("money-amt").value = "";
   });
 });
@@ -525,11 +592,18 @@ $("scam-form").addEventListener("submit", async (e) => {
     $("scam-acts").hidden = false;
     $("scam-report").hidden = status === 2 || mine;
     $("scam-bond").hidden = !mine;
+    const opens = c[3] + 30n * 86400n;
+    const early = mine && status === 1 && BigInt(Math.floor(Date.now() / 1000)) < opens;
+    $("scam-bond").disabled = early;
+    if (early) out.textContent += " Your bond comes back when a reviewer confirms the report, or from " + when(opens) + " if nobody has resolved it.";
   } catch (err) { out.className = "result bad"; out.textContent = "Could not check. " + explain(err); }
 });
 $("scam-report").addEventListener("click", () => {
   if (needWallet() || !checked) return;
   act("Report", async () => {
+    if (checked.toLowerCase() === me.toLowerCase()) throw new Error("You cannot report your own address.");
+    const [have] = await call(NET.musd, enc(SIG.balanceOf, me));
+    if (have < BOND) throw new Error("A report needs a 10 MUSD bond from your wallet, which holds " + fmt(have) + " MUSD.");
     await ensureAllowance(NET.shield, BOND);
     await send(NET.shield, enc(SIG.report, checked, ZERO32), "Report address");
     $("scam-form").requestSubmit();
@@ -550,10 +624,14 @@ $("t4-stranger").addEventListener("click", () => tryRequest(false));
 $("t4-invoice").addEventListener("click", () => tryRequest(true));
 $("t5-go").addEventListener("click", () => document.querySelector('[data-tab="waiting"]').click());
 
-if (VIEW) {
-  me = VIEW;
-  $("who").hidden = false;
-  $("who").textContent = "Viewing " + short(me);
-  $("connect-2").hidden = true;
-}
-refresh();
+$("disconnect").addEventListener("click", disconnect);
+
+(async () => {
+  if (!(await reconnect()) && VIEW) {
+    me = VIEW;
+    $("who").hidden = false;
+    $("who").textContent = "Viewing " + short(me);
+    $("connect-2").hidden = true;
+  }
+  await refresh();
+})();

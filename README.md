@@ -13,6 +13,11 @@ Status: deployed on Mezo testnet (chain 31611). Not audited.
 | SellarSafe | [`0x9bf0180a21fFfB35b815Bf0B264706E72e0a26Aa`](https://explorer.test.mezo.org/address/0x9bf0180a21fFfB35b815Bf0B264706E72e0a26Aa) |
 | SellarShield | [`0x799d90D2FA41b9827c345E480BEC635B3EF0c444`](https://explorer.test.mezo.org/address/0x799d90D2FA41b9827c345E480BEC635B3EF0c444) |
 
+**Live proof:** [docs/EVIDENCE.md](docs/EVIDENCE.md) lists a full run on Mezo testnet, 35 real
+transactions: a Mezo loan opened, a real invoice paid, a poisoned one held, the cover fund deposited
+in Mezo's Stability Pool, a scam reported and confirmed, the victim refunded, and a payment held
+because the owner's Mezo loan was below her floor. Every wallet in that run is a team test wallet.
+
 ## What it does
 
 1. **Guard.** An owner keeps MUSD in `SellarSafe` and names an agent key. The agent can only *ask*
@@ -42,7 +47,7 @@ Status: deployed on Mezo testnet (chain 31611). Not audited.
 - **Stability Pool risk.** Deposits there can shrink in liquidations and withdrawals pause while any
   loan is under-collateralised. Refunds are capped, and a claim may have to wait and be retried.
 - **Refunds are partial by design**: at most 500 MUSD and at most 20% of the fund per claim.
-- Not audited. Testnet only for now. The reviewer on testnet is the deployer's test wallet.
+- Not audited. Testnet only for now. The reviewer on testnet is a separate team test wallet.
 
 ## Layout
 

@@ -47,6 +47,9 @@ const GUARD = [
 
 const $ = (id) => document.getElementById(id);
 let provider = null, me = null, account = null, holdTtl = 86400n;
+// Read-only view of any safe, with no wallet: add ?view=0x… to the address. Nothing can be sent.
+const VIEW = (() => { const v = new URLSearchParams(location.search).get("view"); return isAddrText(v) ? v : null; })();
+function isAddrText(s) { return /^0x[0-9a-fA-F]{40}$/.test(s || ""); }
 
 // ---------------------------------------------------------------- encoding
 
@@ -216,7 +219,13 @@ function reasonsFor(h) {
 // ---------------------------------------------------------------- rendering
 
 function el(tag, cls, text) { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; }
-function button(text, cls, onClick) { const b = el("button", "btn " + (cls || ""), text); b.type = "button"; b.addEventListener("click", onClick); return b; }
+function button(text, cls, onClick) {
+  const b = el("button", "btn " + (cls || ""), text);
+  b.type = "button";
+  if (!provider) { b.disabled = true; b.title = "Viewing only. Connect this wallet to act."; }
+  b.addEventListener("click", onClick);
+  return b;
+}
 const nameOf = (a) => names()[a.toLowerCase()];
 // A row: an amount or title, who it is to, lines of explanation, then a status label and buttons.
 // lines: [text, kind] where kind is "" (plain), "warn" (danger) or "meta" (timestamps, addresses).
@@ -422,7 +431,7 @@ async function refresh() {
 
 // ---------------------------------------------------------------- actions
 
-const needWallet = () => { if (!me) { say("Connect your wallet first."); return true; } return false; };
+const needWallet = () => { if (!me || !provider) { say("Connect your wallet first."); return true; } return false; };
 
 for (const b of document.querySelectorAll(".js-connect")) b.addEventListener("click", connect);
 
@@ -538,4 +547,10 @@ $("t4-stranger").addEventListener("click", () => tryRequest(false));
 $("t4-invoice").addEventListener("click", () => tryRequest(true));
 $("t5-go").addEventListener("click", () => document.querySelector('[data-tab="waiting"]').click());
 
+if (VIEW) {
+  me = VIEW;
+  $("who").hidden = false;
+  $("who").textContent = "Viewing " + short(me);
+  $("connect-2").hidden = true;
+}
 refresh();

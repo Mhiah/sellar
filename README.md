@@ -146,6 +146,8 @@ Both contracts are deployed and source-verified. Every step below is a real tran
 | 8 | The reviewer confirmed the scam | Victim **refunded 40 MUSD**, reporter got his bond back |
 | 9 | The owner's Mezo loan was below her floor | Payment to a trusted vendor **held** |
 | 10 | The guard run: "pay Ade 5 MUSD", agent tries 12 | **Held**, only because of the guard |
+| 11 | The owner clicked **Release** on one held payment in the dashboard | 12 MUSD paid, from her own wallet |
+| 12 | The owner clicked **Reject** on the other | Rejected. Nothing left the safe |
 
 | | |
 |---|---|

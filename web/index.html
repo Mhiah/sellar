@@ -1,0 +1,145 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sellar</title>
+<meta name="description" content="The four-eyes rule for AI agents, on Mezo. Your agent can ask to pay in MUSD. It cannot pay alone.">
+<style>
+@font-face{font-family:"Bricolage";src:url(bricolage.woff2) format("woff2");font-weight:200 800;font-display:swap}
+:root{--ink:#18214A;--soft:#6A7291;--line:#DDE2EC;--blue:#2438D6;--bg:#FDFDFE;--bad:#A8261B;--ok:#136B45}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:400 17px/1.5 "Bricolage",system-ui,sans-serif}
+h1,h2,p{margin:0}
+button,input{font:inherit;color:inherit}
+button{cursor:pointer}
+a{color:var(--blue)}
+[hidden]{display:none!important}
+.wrap{max-width:760px;margin:0 auto;padding:0 28px}
+header{display:flex;justify-content:space-between;align-items:center;gap:16px;padding:28px 0;flex-wrap:wrap}
+.mark{font-weight:800;font-size:22px;letter-spacing:-.02em}
+nav{display:flex;gap:22px;font-size:15px;flex-wrap:wrap}
+nav button{border:0;background:none;padding:4px 0;color:var(--soft)}
+nav button[aria-current="page"]{color:var(--ink);font-weight:600}
+.wallet{font-size:15px;color:var(--soft)}
+h1{font-size:46px;line-height:1.08;font-weight:700;letter-spacing:-.03em;margin:56px 0 10px}
+h2{font-size:28px;font-weight:700;letter-spacing:-.02em;margin:56px 0 8px}
+.sub{color:var(--soft);max-width:46ch}
+.list{margin-top:36px;border-bottom:1px solid var(--line)}
+.item{padding:26px 0;border-top:1px solid var(--line);display:grid;grid-template-columns:1fr auto;gap:6px 24px;align-items:center}
+.amt{font-size:26px;font-weight:700;letter-spacing:-.02em}
+.amt span,.muted{font-weight:400;color:var(--soft);font-size:16px;letter-spacing:0}
+.why{grid-column:1;max-width:48ch}
+.why.warn{color:var(--bad)}
+.acts{grid-row:1/3;grid-column:2;display:flex;gap:10px;flex-wrap:wrap;justify-content:flex-end}
+.btn{border:1.5px solid var(--ink);background:none;border-radius:8px;padding:9px 16px;font-weight:600;font-size:15px}
+.btn.go{background:var(--blue);border-color:var(--blue);color:#fff}
+.btn.bad{border-color:var(--bad);color:var(--bad)}
+.btn:disabled{opacity:.45;cursor:default}
+.btn:focus-visible,input:focus-visible,nav button:focus-visible{outline:3px solid var(--blue);outline-offset:2px}
+.facts{display:grid;grid-template-columns:repeat(3,1fr);gap:24px;margin:52px 0 0}
+.facts p:first-child{color:var(--soft);font-size:15px}
+.facts p:last-child{font-size:26px;font-weight:700;letter-spacing:-.02em}
+.facts span{font-size:15px;font-weight:400;color:var(--soft);letter-spacing:0}
+form{display:grid;gap:14px;margin-top:22px;max-width:460px}
+label{display:grid;gap:5px;font-size:15px;color:var(--soft)}
+input{border:1.5px solid var(--line);border-radius:8px;padding:10px 12px;background:#fff;color:var(--ink);min-width:0}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.row input{flex:1}
+.note{margin-top:14px;max-width:52ch}
+.note.bad{color:var(--bad)} .note.ok{color:var(--ok)}
+#status{position:sticky;bottom:0;background:var(--ink);color:#fff;padding:12px 16px;border-radius:10px 10px 0 0;font-size:15px;margin-top:40px}
+#status a{color:#C9D2F5}
+footer{margin:64px 0 40px;color:var(--soft);font-size:14px}
+@media (max-width:620px){h1{font-size:36px}.item{grid-template-columns:1fr}.acts{grid-row:auto;grid-column:1;justify-content:flex-start}.facts{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="mark">Sellar</div>
+    <nav id="nav" aria-label="Sections">
+      <button data-tab="waiting" aria-current="page">Waiting</button>
+      <button data-tab="payees">Payees</button>
+      <button data-tab="rules">Rules</button>
+      <button data-tab="scams">Scam list</button>
+      <button data-tab="activity">Activity</button>
+    </nav>
+    <div class="wallet"><button class="btn" id="connect">Connect wallet</button><span id="who" hidden></span></div>
+  </header>
+
+  <main>
+    <section id="waiting">
+      <h1 id="headline">Your agent asks.<br>You decide.</h1>
+      <p class="sub" id="lede">Sellar holds your MUSD on Mezo. Your AI agent can ask to pay. Anything outside your rules waits here until you release it.</p>
+      <div class="list" id="holds" hidden></div>
+      <div class="facts">
+        <div><p>In your safe</p><p id="f-safe">–</p></div>
+        <div><p>Your Mezo loan</p><p id="f-loan">–</p></div>
+        <div><p>Cover fund</p><p id="f-fund">–</p></div>
+      </div>
+      <div id="money" hidden>
+        <h2>Add or take out MUSD</h2>
+        <p class="sub">Your wallet holds <span id="wallet-musd">–</span> MUSD.</p>
+        <form id="money-form">
+          <label>Amount in MUSD <input id="money-amt" inputmode="decimal" placeholder="0.00" required></label>
+          <div class="row"><button class="btn go" value="deposit">Deposit</button><button class="btn" value="withdraw">Withdraw</button></div>
+        </form>
+      </div>
+    </section>
+
+    <section id="payees" hidden>
+      <h1>People your agent may pay</h1>
+      <p class="sub">Your agent can pay these addresses on its own, within your limits. Payments to anyone else wait for you.</p>
+      <div class="list" id="payee-list"></div>
+      <form id="payee-form">
+        <label>Name, kept in this browser only <input id="payee-name" placeholder="Ade"></label>
+        <label>Address <input id="payee-addr" placeholder="0x…" required></label>
+        <div class="row"><button class="btn go">Trust this address</button></div>
+      </form>
+    </section>
+
+    <section id="rules" hidden>
+      <h1>What your agent may do alone</h1>
+      <p class="sub">Anything beyond these rules is held for you.</p>
+      <form id="rules-form">
+        <label>Agent key address <input id="r-agent" placeholder="0x…" required></label>
+        <label>Most MUSD in one payment <input id="r-per" inputmode="decimal" required></label>
+        <label>Most MUSD in one day <input id="r-day" inputmode="decimal" required></label>
+        <label>Minutes a new payee must wait <input id="r-cool" inputmode="numeric" required></label>
+        <label>Hold payments while your Mezo loan is below this ratio, in percent. 0 turns it off <input id="r-icr" inputmode="decimal" required></label>
+        <div class="row"><button class="btn go">Save rules</button></div>
+      </form>
+      <h2>Freeze</h2>
+      <p class="sub" id="freeze-text">Stops every agent payment and release until you unfreeze.</p>
+      <div class="row" style="margin-top:16px"><button class="btn bad" id="freeze">Freeze agent</button></div>
+    </section>
+
+    <section id="scams" hidden>
+      <h1>Scam list</h1>
+      <p class="sub">One report protects everyone. Every Sellar safe holds payments to a reported address.</p>
+      <form id="scam-form">
+        <label>Address to check <input id="scam-addr" placeholder="0x…" required></label>
+        <div class="row"><button class="btn go">Check</button></div>
+      </form>
+      <p class="note" id="scam-result" hidden></p>
+      <div class="row" id="scam-acts" style="margin-top:16px" hidden>
+        <button class="btn bad" id="scam-report">Report with a 10 MUSD bond</button>
+        <button class="btn" id="scam-bond" hidden>Take my bond back</button>
+      </div>
+      <p class="note muted">A bond comes back when a reviewer confirms the report. A false report loses it.</p>
+    </section>
+
+    <section id="activity" hidden>
+      <h1>Activity</h1>
+      <p class="sub">Every payment your agent asked for from this safe.</p>
+      <div class="list" id="activity-list"></div>
+    </section>
+  </main>
+
+  <div id="status" role="status" hidden></div>
+  <footer>Mezo testnet. Not audited. <a href="https://github.com/Mhiah/sellar">Code and evidence</a></footer>
+</div>
+<script src="app.js"></script>
+</body>
+</html>

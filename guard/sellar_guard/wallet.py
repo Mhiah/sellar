@@ -24,6 +24,21 @@ from .mezo import SellarClient, describe, to_units
 # 4eyes findings the chain has no way to see. Any of these makes the guard ask for a human.
 ESCALATE_CODES = {"injected", "lookalike", "changed", "intent"}
 
+# The hold's memo carries what the guard saw, so the owner's dashboard can say why in plain words:
+# two marker bytes (0x5e11), one byte of these flags, then the rest of the reference's hash.
+MEMO_MARKER = b"\x5e\x11"
+MEMO_FLAGS = {"injected": 1, "lookalike": 2, "changed": 4, "intent": 8}
+
+
+def build_memo(reference: str, found: list[Reason]) -> bytes:
+    digest = keccak(text=reference or "")
+    flags = 0
+    for r in found:
+        flags |= MEMO_FLAGS.get(r.code, 0)
+    if not flags:
+        return digest if reference else b"\0" * 32
+    return MEMO_MARKER + bytes([flags]) + digest[3:]
+
 
 @dataclass
 class PayResult:
@@ -75,7 +90,7 @@ class GuardedWallet:
         escalate = any(r.code in ESCALATE_CODES or r.severity == CRITICAL for r in found)
         guard_reasons = [r.text for r in found]
 
-        out = self.client.request(to, to_units(amount), keccak(text=memo) if memo else b"\0" * 32, escalate)
+        out = self.client.request(to, to_units(amount), build_memo(memo, found), escalate)
         chain_reasons = describe(out["reasons"])
         common = dict(guard_reasons=guard_reasons, chain_reasons=chain_reasons, tx=out["tx"], url=out["url"],
                       escalated=escalate)

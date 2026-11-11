@@ -191,6 +191,22 @@ Why a request is held (the `reasons` value is the sum of these):
 Neither contract can be upgraded or paused, and fees, caps and windows are fixed at deployment.
 The only special role is the reviewer, who can confirm or dismiss a case and nothing else.
 
+## The website
+
+`web/` is the owner's side: a static page with no dependencies that talks to your wallet and to
+Mezo directly.
+
+| Section | What you do there |
+|---|---|
+| Waiting | See each held payment with the reason in plain words. Release or reject it. Add or take out MUSD. |
+| Payees | Trust or remove the addresses your agent may pay on its own. |
+| Rules | Name the agent key, set the limits and the loan floor, freeze the agent. |
+| Scam list | Check any address. Report one with a 10 MUSD bond. Take a bond back. |
+| Activity | Every payment your agent asked for, and refunds you can claim. |
+
+The guard writes what it saw into each hold, so the page can say "this address came from something
+your agent read" or "this is more than you asked for", not just a number.
+
 ## The guard
 
 `guard/` is the off-chain half, in Python.
@@ -238,7 +254,7 @@ DEPLOYER_KEY=<testnet key> scripts/demo.sh
 | `contracts/test/Fork.t.sol` | Pay, hold, report, confirm, refund and the Stability Pool deposit against Mezo's real testnet contracts. |
 | `guard/tests/test_guard.py` | The guard's decisions, the transaction encoding and the Hermes adapter. |
 
-57 contract tests, 5 fork tests and 10 guard tests. All run on every push.
+57 contract tests, 5 fork tests and 11 guard tests. All run on every push.
 
 ## Honest limits
 
@@ -257,8 +273,7 @@ DEPLOYER_KEY=<testnet key> scripts/demo.sh
 
 ## What's next
 
-1. A web dashboard: connect a wallet, see your safe, approve or reject holds, report an address,
-   watch the cover fund.
+1. Run the Hermes adapter inside Hermes and record it.
 2. Outside testers on testnet, with their transactions listed separately from the team's.
 3. Replace the single reviewer with bonded jurors, then an external audit before mainnet.
 
@@ -270,6 +285,7 @@ contracts/src/SellarShield.sol    the scam list and the cover fund
 contracts/test/                   unit, fuzz, invariant and fork tests
 contracts/script/Deploy.s.sol     deployment against Mezo's contracts
 guard/                            the guard, the Mezo client and the Hermes adapter
+web/                              the owner's website
 scripts/demo.sh                   the live run
 docs/EVIDENCE.md                  every live transaction, linked
 ```

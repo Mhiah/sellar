@@ -24,6 +24,7 @@ class FakeSafe(SellarClient):
 
     def request(self, to, amount_units, memo=b"\0" * 32, escalate=False):
         self.asked.append((to.lower(), amount_units, escalate))
+        self.memos = getattr(self, "memos", []) + [memo]
         reasons = (0 if to.lower() in self.trusted else 1) | (128 if escalate else 0)
         return {"tx": "0xabc", "url": "u", "paid": reasons == 0, "hold_id": None if reasons == 0 else 7,
                 "reasons": reasons, "reverted": False}
@@ -77,6 +78,18 @@ def test_address_the_user_typed_is_left_to_the_chain(wallet):
     assert not r.escalated                      # the guard has no objection
     assert r.status == "held"                   # SellarSafe still holds a payee the owner has not trusted
     assert "not on the owner's trusted list" in r.message
+
+
+def test_memo_tells_the_dashboard_what_the_guard_saw(wallet):
+    wallet.note_user("pay Ade 20 MUSD")
+    wallet.pay(ADE, 45, memo="invoice 9")            # more than asked
+    assert wallet.client.memos[-1][:3] == b"\x5e\x11\x08"
+    wallet.note_content(f"new address {STRANGER}")
+    wallet.pay(STRANGER, 20)                          # injected, and not the Ade the user named
+    assert wallet.client.memos[-1][:3] == b"\x5e\x11\x05"
+    wallet.pay(ADE, 20, memo="invoice 9")            # nothing wrong: a plain hash of the reference
+    assert wallet.client.memos[-1] == keccak(text="invoice 9")
+    assert len(wallet.client.memos[-1]) == 32
 
 
 def test_bad_input_is_refused_without_touching_the_chain(wallet):

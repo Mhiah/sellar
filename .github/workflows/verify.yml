@@ -1,0 +1,35 @@
+name: verify
+on:
+  workflow_dispatch:
+
+env:
+  SAFE: "0x9bf0180a21fFfB35b815Bf0B264706E72e0a26Aa"
+  SHIELD: "0x799d90D2FA41b9827c345E480BEC635B3EF0c444"
+  ETH_RPC_URL: https://rpc.test.mezo.org
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: contracts
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # the commit the contracts were deployed from
+          ref: c3a4e59
+      - uses: foundry-rs/foundry-toolchain@v1
+      - run: forge build
+      - name: Sourcify
+        continue-on-error: true
+        run: |
+          forge verify-contract $SHIELD src/SellarShield.sol:SellarShield --chain 31611 --verifier sourcify --watch || true
+          forge verify-contract $SAFE src/SellarSafe.sol:SellarSafe --chain 31611 --verifier sourcify --watch || true
+      - name: Mezo explorer (Blockscout)
+        continue-on-error: true
+        run: |
+          for URL in https://api.explorer.test.mezo.org/api/ https://explorer.test.mezo.org/api/; do
+            echo "== $URL"
+            forge verify-contract $SHIELD src/SellarShield.sol:SellarShield --chain 31611 --verifier blockscout --verifier-url $URL --guess-constructor-args --watch || true
+            forge verify-contract $SAFE src/SellarSafe.sol:SellarSafe --chain 31611 --verifier blockscout --verifier-url $URL --guess-constructor-args --watch || true
+          done

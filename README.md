@@ -87,15 +87,17 @@ forge test
 Result:
 
 ```
-Ran 26 tests for test/SellarShield.t.sol:SellarShieldTest
-Suite result: ok. 26 passed; 0 failed; 0 skipped
 Ran 27 tests for test/SellarSafe.t.sol:SellarSafeTest
 Suite result: ok. 27 passed; 0 failed; 0 skipped
-Ran 4 tests for test/Invariants.t.sol:InvariantsTest
-Suite result: ok. 4 passed; 0 failed; 0 skipped
+Ran 26 tests for test/SellarShield.t.sol:SellarShieldTest
+Suite result: ok. 26 passed; 0 failed; 0 skipped
+Ran 12 tests for test/SellarV2.t.sol:SellarV2Test
+Suite result: ok. 12 passed; 0 failed; 0 skipped
 Ran 4 tests for test/SellarFaucet.t.sol:SellarFaucetTest
 Suite result: ok. 4 passed; 0 failed; 0 skipped
-Ran 5 test suites: 61 tests passed, 0 failed, 5 skipped (66 total tests)
+Ran 4 tests for test/Invariants.t.sol:InvariantsTest
+Suite result: ok. 4 passed; 0 failed; 0 skipped
+Ran 6 test suites: 73 tests passed, 0 failed, 5 skipped (78 total tests)
 ```
 
 The 5 skipped tests are the ones that need Mezo's network. Run them against a fork of Mezo
@@ -135,12 +137,14 @@ button the page plays the guard for you, since there is no real agent reading a 
 
 ## Results: what ran live on Mezo testnet
 
-Both contracts are deployed and source-verified. Every step below is a real transaction, linked in
-[docs/EVIDENCE.md](docs/EVIDENCE.md).
+The contracts are deployed and source-verified. Every step below is a real transaction, linked in
+[docs/EVIDENCE.md](docs/EVIDENCE.md). Steps 1 to 11 ran on the current contracts (version 2). Steps 12
+and 13 were sent from the dashboard on version 1 and are linked in
+[docs/EVIDENCE-v1.md](docs/EVIDENCE-v1.md).
 
 | # | What happened | Result |
 |---|---|---|
-| 1 | The owner opened a Mezo loan: 0.045 BTC locked, 1,800 MUSD borrowed | Loan open |
+| 1 | The owner has a Mezo loan: 0.045 BTC locked, 1,800 MUSD borrowed | Ratio read live: 166.8% |
 | 2 | The agent paid a trusted vendor 20 MUSD | **Paid at once** |
 | 3 | The agent, fooled by a fake invoice, tried to pay a scammer | **Held.** Nothing left the safe |
 | 4 | The cover fund deposited 187.5 MUSD into Mezo's Stability Pool | 62.5 MUSD kept liquid |
@@ -149,24 +153,26 @@ Both contracts are deployed and source-verified. Every step below is a real tran
 | 7 | The victim's agent tried to pay the scammer again | **Held**, although he had trusted the address |
 | 8 | The reviewer confirmed the scam | Victim **refunded 40 MUSD**, reporter got his bond back |
 | 9 | The owner's Mezo loan was below her floor | Payment to a trusted vendor **held** |
-| 10 | The guard run: "pay Ade 5 MUSD", agent tries 12 | **Held**, only because of the guard |
-| 11 | The owner clicked **Release** on one held payment in the dashboard | 12 MUSD paid, from her own wallet |
-| 12 | The owner clicked **Reject** on the other | Rejected. Nothing left the safe |
+| 10 | The cover fund sold 0.0005 BTC for MUSD at Mezo's price, less 1% | **36.71 MUSD added** to the money ready for refunds |
+| 11 | The guard run: "pay Ade 5 MUSD", agent tries 12 | **Held**, only because of the guard |
+| 12 | The owner clicked **Release** on one held payment in the dashboard | 12 MUSD paid, from her own wallet |
+| 13 | The owner clicked **Reject** on the other | Rejected. Nothing left the safe |
 
 | | |
 |---|---|
 | Network | Mezo testnet (chain 31611) |
-| SellarSafe | [`0x9bf0180a21fFfB35b815Bf0B264706E72e0a26Aa`](https://explorer.test.mezo.org/address/0x9bf0180a21fFfB35b815Bf0B264706E72e0a26Aa) |
-| SellarShield | [`0x799d90D2FA41b9827c345E480BEC635B3EF0c444`](https://explorer.test.mezo.org/address/0x799d90D2FA41b9827c345E480BEC635B3EF0c444) |
-| SellarFaucet (testnet only) | [`0x5630dE2D61947CcCA0fF9D5F6330238c2415AF03`](https://explorer.test.mezo.org/address/0x5630dE2D61947CcCA0fF9D5F6330238c2415AF03) |
+| SellarSafe | [`0x9e0Fe4b54f80A62527A7a2A19DEDd3c97e66FD3A`](https://explorer.test.mezo.org/address/0x9e0Fe4b54f80A62527A7a2A19DEDd3c97e66FD3A) |
+| SellarShield | [`0x245C2cA317F640b8976e2584d68Eed59Fc698701`](https://explorer.test.mezo.org/address/0x245C2cA317F640b8976e2584d68Eed59Fc698701) |
+| SellarFaucet (testnet only) | [`0x87737a1e1BF82d90564A13a170c687a84191BAbd`](https://explorer.test.mezo.org/address/0x87737a1e1BF82d90564A13a170c687a84191BAbd) |
 | Source | Verified on Mezo's explorer and on Sourcify |
-| Tests | 61 contract, 5 fork, 16 guard. All run on every push |
+| Tests | 73 contract, 5 fork, 16 guard. All run on every push |
 | Audit | None. Testnet only |
 | Users | Team test wallets only so far. No outside users yet |
 
 Not exercised live yet: withdrawing from the Stability Pool to pay a claim (the refund above came
-from the liquid part of the fund), and the BTC reward for reporters (the pool had not paid the fund
-any BTC yet).
+from the liquid part of the fund), and a real BTC gain from the pool. No liquidation has paid the
+fund on testnet yet, so in step 10 the team sent the fund 0.0005 BTC to stand in for one. The sale
+itself, at Mezo's live price, is real.
 
 ## How a payment flows
 
@@ -210,7 +216,7 @@ rules still hold the payment. The agent's key cannot approve, withdraw or change
 |---|---|
 | **MUSD** | Every balance, limit, bond, fee and refund is in MUSD. |
 | **Stability Pool** | The cover fund keeps 25% liquid and deposits the rest with `provideToSP`, so idle MUSD earns BTC from liquidations. `rebalance()` is open to anyone. |
-| **BTC gains** | BTC earned in the pool stays in the fund. A tenth of it is shared between the reporters of each confirmed case. The rest cannot be spent yet (see Honest limits). |
+| **BTC gains** | BTC earned in the pool stays in the fund. A tenth of it is shared between the reporters of each confirmed case. Anyone can buy the rest with MUSD through `buyBtc`, at the PriceFeed price less 1%, and that MUSD goes into the fund to pay refunds. |
 | **TroveManager + PriceFeed** | An owner can set a floor on their own Mezo loan. While its collateral ratio is below the floor, agent payments are held. If Mezo's contracts cannot be read, the payment is held too. |
 | **BorrowerOperations** | The live run opens a real loan to fund the demo and to exercise the loan check. |
 
@@ -246,14 +252,11 @@ Mezo's contract addresses come from the official `@mezo-org/musd-contracts` pack
 - **Stability Pool risk.** Deposits there can shrink in liquidations, and withdrawals pause while
   any loan on Mezo is under-collateralised. Refunds are capped, and a claim may have to wait.
 - **Refunds are partial by design.** At most 500 MUSD, and at most 20% of the fund.
-- **The fund's BTC cannot pay refunds yet.** Refunds are paid in MUSD only. BTC the fund earns in the
-  Stability Pool stays in the contract: a tenth goes to reporters and nothing can spend the rest.
-  The pool also turns part of a deposit into BTC during liquidations, so the MUSD available for
-  refunds can go down. The next version needs a way to turn that BTC back into MUSD.
-- **Releases count toward the daily limit.** A payment the owner releases uses up part of the
-  agent's daily allowance for that day.
-- **The dashboard reads the newest 200 holds and receipts** across all safes. Under heavy use,
-  older ones would stop showing there, though they stay on-chain.
+- **The fund's BTC becomes refund money only when someone buys it.** Refunds are paid in MUSD.
+  BTC the fund earns is sold through `buyBtc` at Mezo's price feed less 1%. That depends on a
+  buyer turning up, and on the price feed being right. Until it is sold, that BTC pays no refunds.
+- **The dashboard shows your newest 200 holds and receipts.** Each safe has its own list on-chain,
+  so other people's activity cannot push yours out. Older ones stay on-chain.
 - **"More than you asked" needs an amount the guard can read**: "5 MUSD", "$5", "5 dollars", or a
   number after pay or send. An amount written out in words is not caught.
 - **The guard forgets.** It remembers what you typed and what the agent read for one conversation.
@@ -279,13 +282,14 @@ Mezo's contract addresses come from the official `@mezo-org/musd-contracts` pack
 | Owner | `withdraw(amount)` | Takes MUSD out. Works even when frozen. |
 | Owner | `configure(agent, perPayment, perDay, cooldown, minIcr)` | Names the agent key and sets the rules. |
 | Owner | `trust(payee)` / `untrust(payee)` | Manages the trusted list. Flagged addresses cannot be trusted. |
-| Owner | `approve(holdId, acknowledgeFlag)` | Releases a hold: that exact payment, once, within a day. |
+| Owner | `approve(holdId, acknowledgeFlag)` | Releases a hold: that exact payment, once, within a day. It does not use up the agent's daily limit. |
 | Owner | `reject(holdId)` | Refuses a hold. |
 | Owner or agent | `freeze(owner)` | Stops every agent payment and release. |
 | Owner | `unfreeze()` | Only the owner can undo a freeze. |
 | Agent | `request(owner, to, amount, memo, escalate)` | Asks to pay. Pays at once if every rule passes, otherwise records a hold. |
 | Anyone | `check(owner, to, amount)` | Dry run: the reasons a request would be held. |
 | Anyone | `loanHealth(owner)` | The owner's Mezo loan and its collateral ratio. |
+| Anyone | `holdCountOf(owner)`, `holdIdsOf(owner, offset, limit)` | An owner's own holds, newest first. |
 
 Why a request is held (the `reasons` value is the sum of these):
 
@@ -312,7 +316,8 @@ Why a request is held (the `reasons` value is the sum of these):
 | Reporter | `withdrawBond(suspect)` | Bond back after a confirmation (with the BTC reward), or after 30 days unresolved. |
 | Payer | `claim(receiptId)` | Refund for a payment to a confirmed scam. |
 | Anyone | `rebalance()` | Moves the fund toward 25% liquid, 75% in the Stability Pool. |
-| Anyone | `statusOf`, `flagInfo`, `fundAssets`, `fundLiquid`, `fundBtc` | Read the list and the fund. |
+| Anyone | `buyBtc(btcAmount, maxMusd)` | Buys BTC the fund earned, with MUSD, at Mezo's price less 1%. `quoteBtc` gives the cost. |
+| Anyone | `statusOf`, `flagInfo`, `fundAssets`, `fundLiquid`, `fundBtc`, `btcForSale`, `receiptIdsOf` | Read the list, the fund and a payer's receipts. |
 | SellarSafe | `recordPayment(payer, payee, amount)` | Writes the receipt for a payment. |
 
 Neither contract can be upgraded or paused, and fees, caps and windows are fixed at deployment.
@@ -343,6 +348,7 @@ The agent key is the only key the guard holds, and that key can only ask to pay.
 | `contracts/test/SellarShield.t.sol` | Bonds, confirm, dismiss, timeouts, every claim rule and cap, a paused pool, a pool that loses deposits, a pool wiped to zero. Fuzzed. |
 | `contracts/test/Invariants.t.sol` | Random owners, agents, reporters and pool behaviour. The safe always holds what owners are owed, bonds are always there, and no payment ever leaves unattended against the rules. |
 | `contracts/test/Fork.t.sol` | Pay, hold, report, confirm, refund and the Stability Pool deposit against Mezo's real testnet contracts. |
+| `contracts/test/SellarV2.t.sol` | Selling the fund's BTC (price, discount, the reporters' share kept back, the buyer's limit), per-owner lists, releases not counting toward the daily limit, no refund for a payer who was warned. |
 | `contracts/test/SellarFaucet.t.sol` | One drip per address, an empty faucet, and the whole try-it path with one wallet. |
 | `guard/tests/test_guard.py` | The guard's decisions, the transaction encoding and the Hermes adapter. |
 

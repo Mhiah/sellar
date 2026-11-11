@@ -17,8 +17,9 @@ TM=0xE47c80e8c23f6B4A1aE41c34837a0599D5D16bb0
 PF=0x86bCF0841622a5dAC14A313a15f96A95421b9366
 SP=0x1CCA7E410eE41739792eA0A24e00349Dd247680e
 MUSD=0x118917a40FAF1CD7a13dB0Ef56C86De7973Ac503
-SAFE="${SAFE:-0x9bf0180a21fFfB35b815Bf0B264706E72e0a26Aa}"
-SHIELD="${SHIELD:-0x799d90D2FA41b9827c345E480BEC635B3EF0c444}"
+SAFE="${SAFE:-0x9e0Fe4b54f80A62527A7a2A19DEDd3c97e66FD3A}"
+SHIELD="${SHIELD:-0x245C2cA317F640b8976e2584d68Eed59Fc698701}"
+V1_SAFE=0x9bf0180a21fFfB35b815Bf0B264706E72e0a26Aa
 ZERO=0x0000000000000000000000000000000000000000
 EXPLORER=https://explorer.test.mezo.org/tx
 
@@ -40,7 +41,7 @@ num() { awk '{print $1}'; }
 call() { cast call "$@" | num; }
 
 {
-  echo "# Live run on Mezo testnet (chain 31611)"
+  echo "# Live run on Mezo testnet (chain 31611), version 2 contracts"
   echo
   echo "Run id \`$RUN\`. SellarSafe \`$SAFE\`, SellarShield \`$SHIELD\`."
   echo
@@ -86,6 +87,11 @@ if [ "$(call $TM 'getTroveStatus(address)(uint8)' "$ADA")" != "1" ]; then
 fi
 ICR=$(call $TM 'getCurrentICR(address,uint256)(uint256)' "$ADA" "$PRICE")
 note "Ada's loan collateral ratio read from TroveManager" "$(cast from-wei "$ICR") (1.0 = 100%)"
+
+V1_BAL=$(cast call $V1_SAFE 'accounts(address)(address,bool,uint64,uint64,uint128,uint128,uint128,uint256,uint256)' "$ADA" | sed -n 8p | num)
+if [ "$V1_BAL" != "0" ]; then
+  tx "Ada moves her MUSD out of the version 1 safe" "$(cast from-wei "$V1_BAL") MUSD back in her wallet" "$K_ADA" $V1_SAFE 'withdraw(uint256)' "$V1_BAL"
+fi
 
 for pair in "agent:$AGENT" "reviewer:$REVIEWER" "Ben:$BEN" "Chidi:$CHIDI" "Chidi's agent:$CHIDI_AGENT"; do
   who="${pair%%:*}"; a="${pair##*:}"
@@ -162,6 +168,27 @@ note "Hold $HOLD reasons" "$REASONS (64 = Mezo loan below the owner's floor, rea
 tx "Ada approves hold $HOLD herself" "Paid on her approval" "$K_ADA" $SAFE 'approve(uint256,bool)' "$HOLD" false
 tx "Ada sets the floor back to 150%" "Configured" "$K_ADA" \
   $SAFE 'configure(address,uint128,uint128,uint64,uint256)' "$AGENT" "$(e18 50)" "$(e18 150)" 0 "$(e18 1.5)"
+
+echo "== 7. the fund turns BTC it earned into refund money"
+GAIN=$(e18 0.0005)
+VALUE=$GAIN tx "Team sends the fund 0.0005 BTC, standing in for a Stability Pool gain (no liquidation has paid the fund on testnet yet)" \
+  "Fund holds 0.0005 BTC for sale" "$K_ADA" $SHIELD
+QUOTE=$(cast call $SHIELD 'quoteBtc(uint256)(uint256,uint256)' "$GAIN")
+COST=$(echo "$QUOTE" | sed -n 1p | num); BTC_PRICE=$(echo "$QUOTE" | sed -n 2p | num)
+MAX=$(python3 -c "print($COST * 101 // 100)")
+note "Price read from Mezo's PriceFeed" "$(cast from-wei "$BTC_PRICE") MUSD per BTC. Cost of 0.0005 BTC after the 1% discount: $(cast from-wei "$COST") MUSD"
+LIQ_BEFORE=$(call $SHIELD 'fundLiquid()(uint256)')
+tx "A buyer approves SellarShield to take the MUSD" "Approved" "$K_ADA" $MUSD 'approve(address,uint256)' $SHIELD "$MAX"
+tx "The buyer buys the fund's BTC with MUSD (buyBtc)" "**BTC sold.** The MUSD went into the cover fund" "$K_ADA" \
+  $SHIELD 'buyBtc(uint256,uint256)' "$GAIN" "$MAX"
+LIQ_AFTER=$(call $SHIELD 'fundLiquid()(uint256)')
+note "Cover fund MUSD ready for refunds" "from $(cast from-wei "$LIQ_BEFORE") to $(cast from-wei "$LIQ_AFTER") MUSD"
+note "BTC left for sale" "$(cast from-wei "$(call $SHIELD 'btcForSale()(uint256)')") BTC"
+
+echo "== 8. each safe has its own list on-chain"
+note "Ada's holds (holdCountOf)" "$(call $SAFE 'holdCountOf(address)(uint256)' "$ADA")"
+note "Ada's receipts (receiptCountOf)" "$(call $SHIELD 'receiptCountOf(address)(uint256)' "$ADA")"
+note "Ada's spending counted toward her agent's daily limit (spentToday)" "$(cast from-wei "$(call $SAFE 'spentToday(address)(uint256)' "$ADA")") MUSD. The 10 MUSD she released herself is not counted"
 
 echo "== final state"
 note "Cover fund total (fundAssets)" "$(cast from-wei "$(call $SHIELD 'fundAssets()(uint256)')") MUSD"

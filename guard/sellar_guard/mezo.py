@@ -26,8 +26,8 @@ MEZO_TESTNET = Network(
     rpc="https://rpc.test.mezo.org",
     explorer="https://explorer.test.mezo.org",
     musd="0x118917a40FAF1CD7a13dB0Ef56C86De7973Ac503",
-    safe="0x9bf0180a21fFfB35b815Bf0B264706E72e0a26Aa",
-    shield="0x799d90D2FA41b9827c345E480BEC635B3EF0c444",
+    safe="0x9e0Fe4b54f80A62527A7a2A19DEDd3c97e66FD3A",
+    shield="0x245C2cA317F640b8976e2584d68Eed59Fc698701",
 )
 
 # Reasons SellarSafe gives for holding a request (bit flags, same values as the contract).

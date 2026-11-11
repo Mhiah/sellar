@@ -17,8 +17,8 @@ jobs:
           TM=0xE47c80e8c23f6B4A1aE41c34837a0599D5D16bb0
           PF=0x86bCF0841622a5dAC14A313a15f96A95421b9366
           MUSD=0x118917a40FAF1CD7a13dB0Ef56C86De7973Ac503
-          SAFE=0x9bf0180a21fFfB35b815Bf0B264706E72e0a26Aa
-          SHIELD=0x799d90D2FA41b9827c345E480BEC635B3EF0c444
+          SAFE=0x9e0Fe4b54f80A62527A7a2A19DEDd3c97e66FD3A
+          SHIELD=0x245C2cA317F640b8976e2584d68Eed59Fc698701
           echo "deployer        $ME"
           echo "btc balance     $(cast balance $ME --ether)"
           echo "gas price wei   $(cast gas-price)"

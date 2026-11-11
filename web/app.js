@@ -7,9 +7,9 @@ const NET = {
   rpc: "https://rpc.test.mezo.org",
   explorer: "https://explorer.test.mezo.org",
   musd: "0x118917a40FAF1CD7a13dB0Ef56C86De7973Ac503",
-  safe: "0x9bf0180a21fFfB35b815Bf0B264706E72e0a26Aa",
-  shield: "0x799d90D2FA41b9827c345E480BEC635B3EF0c444",
-  faucet: "0x5630dE2D61947CcCA0fF9D5F6330238c2415AF03", // testnet only: 25 test MUSD per address
+  safe: "0x9e0Fe4b54f80A62527A7a2A19DEDd3c97e66FD3A",
+  shield: "0x245C2cA317F640b8976e2584d68Eed59Fc698701",
+  faucet: "0x87737a1e1BF82d90564A13a170c687a84191BAbd", // testnet only: 25 test MUSD per address
 };
 
 // Function selectors (first 4 bytes of keccak of the signature).
@@ -21,7 +21,7 @@ const SIG = {
   report: "0xcaf2cbc5", fundAssets: "0x3c93b9f2", receiptCount: "0x7f038f3c", receipts: "0x0f7ee1ec",
   claim: "0x379607f5", withdrawBond: "0x7529d9df", cases: "0x2dfe4226", hasReported: "0x202e053d",
   balanceOf: "0x70a08231", allowance: "0xdd62ed3e", approve: "0x095ea7b3",
-  feeBps: "0x24a9d853", request: "0x233e7c48", drip: "0x9f678cca", claimed: "0xc884ef83", remaining: "0x55234ec0",
+  feeBps: "0x24a9d853", holdIdsOf: "0x33de5ead", receiptIdsOf: "0x4e63ce01", request: "0x233e7c48", drip: "0x9f678cca", claimed: "0xc884ef83", remaining: "0x55234ec0",
 };
 const TOPIC_TRUSTED = "0x85825a10f1ed53996ee005fa260432333e88823a0cfed7324f257f7f4d4df244";
 const BOND = 10n * 10n ** 18n;
@@ -226,23 +226,18 @@ async function loadAccount() {
     balance: w[7], minIcr: w[8],
   };
 }
-// The newest 200 ids, newest first. Holds and receipts are shared lists across every safe.
-function newest(count) {
-  const out = [];
-  for (let i = count - 1n; i >= 0n && out.length < 200; i--) out.push(i);
-  return out;
-}
+// Each safe has its own list of hold ids and receipt ids on-chain. Read the newest 200 of each.
+const idList = (w) => w.slice(2, 2 + Number(w[1]));
 async function loadHolds() {
-  const [n] = await call(NET.safe, SIG.holdCount);
-  const rows = await Promise.all(newest(n).map(async (i) => [i, await call(NET.safe, enc(SIG.holds, i))]));
-  return rows.filter(([, w]) => addr(w[0]).toLowerCase() === me.toLowerCase()).map(([i, w]) =>
-    ({ id: i, to: addr(w[1]), amount: w[2], at: w[3], reasons: Number(w[4]), state: Number(w[5]), memo: pad(w[6].toString(16)) }));
+  const ids = idList(await call(NET.safe, enc(SIG.holdIdsOf, me, 0n, 200n)));
+  const rows = await Promise.all(ids.map((i) => call(NET.safe, enc(SIG.holds, i))));
+  return rows.map((w, k) =>
+    ({ id: ids[k], to: addr(w[1]), amount: w[2], at: w[3], reasons: Number(w[4]), state: Number(w[5]), memo: pad(w[6].toString(16)) }));
 }
 async function loadReceipts() {
-  const [n] = await call(NET.shield, SIG.receiptCount);
-  const rows = await Promise.all(newest(n).map(async (i) => [i, await call(NET.shield, enc(SIG.receipts, i))]));
-  return rows.filter(([, w]) => addr(w[0]).toLowerCase() === me.toLowerCase()).map(([i, w]) =>
-    ({ id: i, to: addr(w[1]), amount: w[2], at: w[3], claimed: w[4] === 1n }));
+  const ids = idList(await call(NET.shield, enc(SIG.receiptIdsOf, me, 0n, 200n)));
+  const rows = await Promise.all(ids.map((i) => call(NET.shield, enc(SIG.receipts, i))));
+  return rows.map((w, k) => ({ id: ids[k], to: addr(w[1]), amount: w[2], at: w[3], claimed: w[4] === 1n }));
 }
 const flagOf = async (a) => { const w = await call(NET.shield, enc(SIG.flagInfo, a)); return { status: Number(w[0]), reporters: Number(w[1]) }; };
 

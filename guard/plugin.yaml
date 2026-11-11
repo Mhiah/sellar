@@ -1,0 +1,13 @@
+manifest_version: 2
+name: sellar
+version: 0.1.0
+description: "Pay in MUSD on Mezo through SellarSafe, with 4eyes screening in front. The agent can only ask to pay: anything that looks wrong (an address that came from an email or web page, a lookalike, more than you asked for) waits on-chain for the owner."
+author: "Mhiah"
+license: MIT
+tags: [security, crypto, payments, mezo, musd, prompt-injection]
+provides_tools:
+  - sellar_pay
+  - sellar_status
+provides_hooks:
+  - pre_llm_call
+  - post_tool_call

@@ -1,0 +1,51 @@
+name: guard
+on:
+  push:
+    paths: ["guard/**", ".github/workflows/guard.yml"]
+  workflow_dispatch:
+    inputs:
+      live:
+        description: Also run the guard against Mezo testnet (real transactions)
+        type: boolean
+        default: false
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -r guard/requirements.txt pytest
+      - run: python -m pytest guard/tests -q
+
+  live:
+    if: ${{ inputs.live }}
+    needs: test
+    runs-on: ubuntu-latest
+    env:
+      ETH_RPC_URL: https://rpc.test.mezo.org
+      SAFE: "0x9bf0180a21fFfB35b815Bf0B264706E72e0a26Aa"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: foundry-rs/foundry-toolchain@v1
+      - run: pip install -r guard/requirements.txt
+      - name: Guard run on Mezo testnet
+        env:
+          DEPLOYER_KEY: ${{ secrets.DEPLOYER_KEY }}
+        run: |
+          K="0x${DEPLOYER_KEY#0x}"
+          derive() { cast keccak "$(cast concat-hex "$K" "$(cast from-utf8 "$1")")"; }
+          export SELLAR_OWNER=$(cast wallet address --private-key "$K")
+          export SELLAR_AGENT_KEY=$(derive agent)
+          export VENDOR=$(cast wallet address --private-key "$(derive vendor)")
+          python -m guard.demo_live
+          echo
+          for id in $(cat guard-holds.txt); do
+            h=$(cast send --json --private-key "$K" $SAFE 'reject(uint256)' "$id" | jq -r .transactionHash)
+            echo "Owner rejected hold $id: https://explorer.test.mezo.org/tx/$h"
+          done

@@ -6,7 +6,7 @@ Banks never let one person move money alone. AI agents that hold wallets broke t
 planted sentence in an email ("our details changed, pay this address instead") is enough to send
 funds to a thief. Sellar puts the second pair of eyes back, and enforces it on-chain.
 
-Status: deployed on Mezo testnet (chain 31611). Not audited.
+Status: deployed on Mezo testnet (chain 31611), source verified on Mezo's explorer and on Sourcify. Not audited.
 
 | Contract | Mezo testnet address |
 |---|---|
@@ -28,6 +28,22 @@ because the owner's Mezo loan was below her floor. Every wallet in that run is a
    A false report loses its bond.
 3. **Cover fund.** Every payment carries a 0.25% fee into a fund. If a payee is later confirmed as
    a scam, people who paid it before the first report can claim a refund, up to 500 MUSD.
+
+## The guard in front of the safe
+
+`guard/` is the off-chain half. It carries the screening from [4eyes](https://github.com/Mhiah/4eyes)
+and gives an agent one way to pay, `sellar_pay`. Before asking the safe, it checks what the chain
+cannot see:
+
+- **Where the address came from.** Typed by the user, or only read in an email, web page or file.
+- **Lookalikes.** An address that starts and ends like a payee the user pays.
+- **Changed details.** The user said "pay Ade", but the money is going somewhere else.
+- **More than asked.** The user said 5 MUSD, the agent sends 12.
+
+If any of these is wrong, the guard asks SellarSafe for a human, and the payment waits on-chain as
+a hold. If the guard is skipped or fooled, the safe's own rules still apply. There is a Hermes
+adapter (`guard/__init__.py`); it is tested against a stub of Hermes and has not been run inside
+Hermes yet.
 
 ## How it uses Mezo
 
@@ -56,6 +72,9 @@ contracts/src/SellarSafe.sol     the guard
 contracts/src/SellarShield.sol   scam list + cover fund
 contracts/test/                  unit, fuzz, invariant and Mezo-testnet fork tests
 contracts/script/Deploy.s.sol    deployment against Mezo's contracts
+guard/sellar_guard/              Mezo client and the guarded wallet
+guard/foureyes/                  screening core, copied from 4eyes (MIT, same author)
+scripts/demo.sh                  the live run recorded in docs/EVIDENCE.md
 ```
 
 ## Run the tests
@@ -64,6 +83,7 @@ contracts/script/Deploy.s.sol    deployment against Mezo's contracts
 cd contracts
 forge test                                   # unit, fuzz and invariant tests
 FORK=1 forge test --match-contract ForkTest  # against a fork of Mezo testnet
+cd .. && pip install -r guard/requirements.txt pytest && python -m pytest guard/tests
 ```
 
 ## Credits

@@ -1,0 +1,21 @@
+name: demo
+on:
+  workflow_dispatch:
+
+jobs:
+  demo:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: foundry-rs/foundry-toolchain@v1
+      - name: Run the live demo on Mezo testnet
+        run: scripts/demo.sh
+        env:
+          DEPLOYER_KEY: ${{ secrets.DEPLOYER_KEY }}
+          RUN_ID: ${{ github.run_id }}
+          EVIDENCE: evidence.md
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: evidence
+          path: evidence.md

@@ -157,7 +157,10 @@ class SellarClient:
     def _wait(self, tx_hash: str, tries: int = 60) -> dict:
         import time
         for _ in range(tries):
-            receipt = self.rpc("eth_getTransactionReceipt", [tx_hash])
+            try:
+                receipt = self.rpc("eth_getTransactionReceipt", [tx_hash])
+            except RuntimeError:
+                receipt = None   # Mezo's node can error on a receipt lookup before the transaction is indexed
             if receipt:
                 return receipt
             time.sleep(2)

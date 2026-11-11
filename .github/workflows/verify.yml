@@ -17,7 +17,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           # the commit the contracts were deployed from
-          ref: c3a4e59
+          ref: c3a4e59a87946d5a4a452236dc3b2aacaf20a984
       - uses: foundry-rs/foundry-toolchain@v1
       - run: forge build
       - name: Sourcify

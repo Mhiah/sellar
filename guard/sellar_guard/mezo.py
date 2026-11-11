@@ -93,7 +93,7 @@ class Rpc:
     def __call__(self, method: str, params: list) -> Any:
         self._id += 1
         body = json.dumps({"jsonrpc": "2.0", "id": self._id, "method": method, "params": params}).encode()
-        req = urllib.request.Request(self.url, data=body, headers={"content-type": "application/json"})
+        req = urllib.request.Request(self.url, data=body, headers={"content-type": "application/json", "user-agent": "sellar-guard/0.1"})
         with urllib.request.urlopen(req, timeout=self.timeout) as resp:
             out = json.load(resp)
         if out.get("error"):

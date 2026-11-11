@@ -1,0 +1,6 @@
+contracts/out/
+contracts/cache/
+contracts/broadcast/
+.env
+node_modules/
+__pycache__/

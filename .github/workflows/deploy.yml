@@ -1,0 +1,29 @@
+name: deploy
+on:
+  workflow_dispatch:
+    inputs:
+      network:
+        description: Network
+        type: choice
+        options: [mezo_testnet]
+        default: mezo_testnet
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: contracts
+    steps:
+      - uses: actions/checkout@v4
+      - uses: foundry-rs/foundry-toolchain@v1
+      - run: forge test --no-match-contract ForkTest
+      - name: Deploy
+        run: forge script script/Deploy.s.sol --rpc-url ${{ inputs.network }} --broadcast
+        env:
+          PRIVATE_KEY: ${{ secrets.DEPLOYER_KEY }}
+      - name: Keep the deployment record
+        uses: actions/upload-artifact@v4
+        with:
+          name: broadcast
+          path: contracts/broadcast

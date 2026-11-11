@@ -148,7 +148,7 @@ tx "Reviewer confirms the scam" "Confirmed" "$K_REVIEWER" $SHIELD 'confirm(addre
 BEFORE=$(call $MUSD 'balanceOf(address)(uint256)' "$CHIDI")
 tx "Chidi claims on receipt $RECEIPT" "**Refunded** from the cover fund" "$K_CHIDI" $SHIELD 'claim(uint256)' "$RECEIPT"
 AFTER=$(call $MUSD 'balanceOf(address)(uint256)' "$CHIDI")
-note "Refund received by Chidi" "$(cast from-wei "$(echo "$AFTER - $BEFORE" | bc)") MUSD"
+note "Refund received by Chidi" "$(cast from-wei "$(python3 -c "print($AFTER - $BEFORE)")") MUSD"
 tx "Ben takes his bond back" "10 MUSD returned" "$K_BEN" $SHIELD 'withdrawBond(address)' "$SCAMMER"
 
 echo "== 6. the safe watches Ada's Mezo loan"

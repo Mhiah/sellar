@@ -6,7 +6,12 @@ Banks never let one person move money alone. AI agents that hold wallets broke t
 planted sentence in an email ("our details changed, pay this address instead") is enough to send
 funds to a thief. Sellar puts the second pair of eyes back, and enforces it on-chain.
 
-Status: contracts written and tested locally. Not deployed yet. Not audited.
+Status: deployed on Mezo testnet (chain 31611). Not audited.
+
+| Contract | Mezo testnet address |
+|---|---|
+| SellarSafe | [`0x9bf0180a21fFfB35b815Bf0B264706E72e0a26Aa`](https://explorer.test.mezo.org/address/0x9bf0180a21fFfB35b815Bf0B264706E72e0a26Aa) |
+| SellarShield | [`0x799d90D2FA41b9827c345E480BEC635B3EF0c444`](https://explorer.test.mezo.org/address/0x799d90D2FA41b9827c345E480BEC635B3EF0c444) |
 
 ## What it does
 
@@ -37,7 +42,7 @@ Status: contracts written and tested locally. Not deployed yet. Not audited.
 - **Stability Pool risk.** Deposits there can shrink in liquidations and withdrawals pause while any
   loan is under-collateralised. Refunds are capped, and a claim may have to wait and be retried.
 - **Refunds are partial by design**: at most 500 MUSD and at most 20% of the fund per claim.
-- Not audited. Testnet only for now.
+- Not audited. Testnet only for now. The reviewer on testnet is the deployer's test wallet.
 
 ## Layout
 

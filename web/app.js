@@ -151,7 +151,7 @@ async function connect() {
       });
     }
     me = accounts[0];
-    $("connect").hidden = true;
+    for (const b of document.querySelectorAll(".js-connect")) b.hidden = true;
     $("who").hidden = false;
     $("who").textContent = short(me);
     say("");
@@ -215,13 +215,23 @@ function reasonsFor(h) {
 
 function el(tag, cls, text) { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; }
 function button(text, cls, onClick) { const b = el("button", "btn " + (cls || ""), text); b.type = "button"; b.addEventListener("click", onClick); return b; }
-function item(title, sub, lines, buttons) {
+const nameOf = (a) => names()[a.toLowerCase()];
+// A row: an amount or title, who it is to, lines of explanation, then a status label and buttons.
+// lines: [text, kind] where kind is "" (plain), "warn" (danger) or "meta" (timestamps, addresses).
+function item(title, to, lines, buttons, status) {
   const row = el("div", "item");
-  const amt = el("div", "amt", title + " ");
-  if (sub) amt.append(el("span", "", sub));
+  const amt = el("div", "amt", title);
+  if (to) {
+    const known = isAddr(to) && nameOf(to);
+    amt.append(el("span", isAddr(to) && !known ? "mono" : "", " to " + (known || (isAddr(to) ? short(to) : to))));
+    if (known) amt.append(el("span", "mono", short(to)));
+  }
   row.append(amt);
-  if (buttons && buttons.length) { const acts = el("div", "acts"); acts.append(...buttons); row.append(acts); }
-  for (const [text, warn] of lines || []) row.append(el("p", "why" + (warn ? " warn" : ""), text));
+  const acts = el("div", "acts");
+  if (status) acts.append(el("span", "status " + status[1], status[0]));
+  if (buttons) acts.append(...buttons);
+  if (acts.children.length) row.append(acts);
+  for (const [text, kind] of lines || []) row.append(el("p", "why" + (kind ? " " + kind : ""), text));
   return row;
 }
 
@@ -238,25 +248,27 @@ async function renderWaiting(holds) {
   const box = $("holds");
   box.replaceChildren();
   box.hidden = pending.length === 0;
-  $("headline").replaceChildren(pending.length ? "Your agent asked." : "Nothing is waiting.", el("br"), pending.length ? "You decide." : "Your agent is within your rules.");
-  $("lede").textContent = pending.length
-    ? (pending.length === 1 ? "One payment is" : pending.length + " payments are") + " waiting. Nothing leaves your safe until you release it."
-    : account.agent === addr(0n)
-      ? "You have not set up an agent yet. Add MUSD below, then name your agent's key under Rules."
-      : "Payments outside your rules will show up here for you to release or reject.";
+  $("holds-count").hidden = pending.length === 0;
+  $("holds-count").textContent = String(pending.length);
+  $("holds-empty").hidden = pending.length > 0;
+  $("holds-empty-text").textContent = account.agent === addr(0n)
+    ? "You have not set up an agent yet. Add MUSD below, then name your agent's key under Rules."
+    : "Nothing is waiting. Your agent is within your rules. Payments outside them will show up here for you to release or reject.";
   for (const h of pending) {
     const flag = await flagOf(h.to);
-    const lines = reasonsFor(h).map((t) => [t, false]);
-    const acts = [button("Reject", "", () => act("Reject", () => send(NET.safe, enc(SIG.reject, h.id), "Reject")))];
+    const lines = reasonsFor(h).map((t) => [t, ""]);
+    const acts = [];
     if (flag.status === 2) {
-      lines.unshift(["A reviewer confirmed this address as a scam. It cannot be released.", true]);
+      lines.unshift(["A reviewer confirmed this address as a scam. It cannot be released.", "warn"]);
     } else {
-      if (flag.status === 1 && !(h.reasons & 16)) lines.unshift(["This address was reported as a scam after your agent asked.", true]);
-      acts.push(button(flag.status === 1 ? "Release anyway" : "Release", "go", () =>
+      if (flag.status === 1 && !(h.reasons & 16)) lines.unshift(["This address was reported as a scam after your agent asked.", "warn"]);
+      acts.push(button(flag.status === 1 ? "Release anyway" : "Release", "primary", () =>
         act("Release", () => send(NET.safe, enc(SIG.approveHold, h.id, flag.status === 1), "Release payment"))));
     }
-    if (account.frozen) lines.unshift(["Your agent is frozen. Unfreeze under Rules to release payments.", true]);
-    box.append(item(fmt(h.amount) + " MUSD", "to " + label(h.to), lines, acts));
+    acts.push(button("Reject", "danger", () => act("Reject", () => send(NET.safe, enc(SIG.reject, h.id), "Reject"))));
+    if (account.frozen) lines.unshift(["Your agent is frozen. Unfreeze under Rules to release payments.", "warn"]);
+    lines.push(["Asked " + when(h.at), "meta"]);
+    box.append(item(fmt(h.amount) + " MUSD", h.to, lines, acts));
   }
 }
 
@@ -282,10 +294,15 @@ async function renderPayees() {
     if (!isAddr(a)) continue;
     const [since] = await call(NET.safe, enc(SIG.trustedAt, me, a));
     if (since === 0n) continue;
-    box.append(item(names()[a] || short(a), names()[a] ? short(a) : "", [["Trusted since " + when(since), false]],
-      [button("Remove", "", () => act("Remove", async () => { await send(NET.safe, enc(SIG.untrust, a), "Remove payee"); saveName(a, ""); }))]));
+    const row = el("div", "item");
+    const title = el("div", "amt", nameOf(a) || short(a));
+    if (nameOf(a)) title.append(el("span", "mono", short(a)));
+    const acts = el("div", "acts");
+    acts.append(button("Remove", "", () => act("Remove", async () => { await send(NET.safe, enc(SIG.untrust, a), "Remove payee"); saveName(a, ""); })));
+    row.append(title, acts, el("p", "why meta", a), el("p", "why meta", "Trusted since " + when(since)));
+    box.append(row);
   }
-  if (!box.children.length) box.append(item("No one yet", "", [["Add an address below. Until then, every payment waits for you.", false]]));
+  if (!box.children.length) box.append(el("p", "empty", "No one yet. Add an address below. Until then, every payment waits for you."));
 }
 
 function renderRules() {
@@ -302,25 +319,27 @@ function renderRules() {
 
 async function renderActivity(holds, receipts) {
   const rows = [];
-  const STATE = { 1: "Waiting for you", 2: "Released by you", 3: "Rejected by you" };
-  for (const h of holds) rows.push({ at: h.at, node: item(fmt(h.amount) + " MUSD", "to " + label(h.to), [[STATE[h.state] + ", asked " + when(h.at), false]]) });
+  const STATE = { 1: ["Waiting for you", "wait"], 3: ["Rejected by you", "bad"] };
+  for (const h of holds) rows.push({ at: h.at, node: item(fmt(h.amount) + " MUSD", h.to, [["Asked " + when(h.at), "meta"]], [], STATE[h.state]) });
   for (const r of receipts) {
-    const lines = [["Paid " + when(r.at), false]];
+    const lines = [["Paid " + when(r.at), "meta"]];
     const acts = [];
-    if (r.claimed) lines.push(["Refunded from the cover fund.", false]);
+    let status = ["Paid", "ok"];
+    if (r.claimed) status = ["Paid, then refunded", "ok"];
     else {
       const c = await call(NET.shield, enc(SIG.cases, r.to));
       if (Number(c[0]) === 2 && r.at < c[3]) {
-        lines.push(["This address was later confirmed as a scam. You can claim a refund.", true]);
-        acts.push(button("Claim refund", "go", () => act("Claim", () => send(NET.shield, enc(SIG.claim, r.id), "Claim refund"))));
+        lines.unshift(["This address was later confirmed as a scam. You can claim a refund.", "warn"]);
+        acts.push(button("Claim refund", "primary", () => act("Claim", () => send(NET.shield, enc(SIG.claim, r.id), "Claim refund"))));
       }
     }
-    rows.push({ at: r.at, node: item(fmt(r.amount) + " MUSD", "to " + label(r.to), lines, acts) });
+    rows.push({ at: r.at, node: item(fmt(r.amount) + " MUSD", r.to, lines, acts, status) });
   }
   rows.sort((a, b) => (a.at < b.at ? 1 : -1));
   const box = $("activity-list");
   box.replaceChildren(...rows.map((r) => r.node));
-  if (!rows.length) box.append(item("Nothing yet", "", [["Payments your agent asks for will be listed here.", false]]));
+  $("activity-empty").hidden = rows.length > 0;
+  $("activity-empty").firstElementChild.textContent = "Nothing yet. Payments your agent asks for will be listed here.";
 }
 
 async function refresh() {
@@ -349,14 +368,26 @@ async function refresh() {
 
 const needWallet = () => { if (!me) { say("Connect your wallet first."); return true; } return false; };
 
-$("connect").addEventListener("click", connect);
+for (const b of document.querySelectorAll(".js-connect")) b.addEventListener("click", connect);
+
+function drawer(open) {
+  $("sidebar").classList.toggle("open", open);
+  $("scrim").hidden = !open;
+  $("menu").setAttribute("aria-expanded", String(open));
+}
+$("menu").addEventListener("click", () => drawer(!$("sidebar").classList.contains("open")));
+$("scrim").addEventListener("click", () => drawer(false));
+document.addEventListener("keydown", (e) => { if (e.key === "Escape") drawer(false); });
 
 $("nav").addEventListener("click", (e) => {
-  const tab = e.target.dataset && e.target.dataset.tab;
-  if (!tab) return;
-  for (const b of $("nav").children) b.toggleAttribute("aria-current", false);
-  e.target.setAttribute("aria-current", "page");
-  for (const s of document.querySelectorAll("main > section")) s.hidden = s.id !== tab;
+  const btn = e.target.closest("button[data-tab]");
+  if (!btn) return;
+  for (const b of $("nav").children) b.removeAttribute("aria-current");
+  btn.setAttribute("aria-current", "page");
+  for (const sec of document.querySelectorAll("main > section")) sec.hidden = sec.id !== btn.dataset.tab;
+  $("context").textContent = btn.textContent.trim();
+  drawer(false);
+  window.scrollTo(0, 0);
 });
 
 $("money-form").addEventListener("submit", (e) => {
@@ -410,12 +441,12 @@ $("scam-form").addEventListener("submit", async (e) => {
   const a = $("scam-addr").value.trim();
   const out = $("scam-result");
   out.hidden = false; $("scam-acts").hidden = true;
-  if (!isAddr(a)) { out.className = "note bad"; out.textContent = "That is not an address. It should start with 0x and have 42 characters."; return; }
+  if (!isAddr(a)) { out.className = "result bad"; out.textContent = "That is not an address. It should start with 0x and have 42 characters."; return; }
   try {
     const c = await call(NET.shield, enc(SIG.cases, a));
     const status = Number(c[0]), reporters = Number(c[2]);
     const people = reporters === 1 ? "1 person" : reporters + " people";
-    out.className = "note " + (status === 1 || status === 2 ? "bad" : "ok");
+    out.className = "result " + (status === 1 || status === 2 ? "bad" : status === 3 ? "ok" : "neutral");
     out.textContent = status === 2 ? "Confirmed scam. Every Sellar safe refuses to release payments to this address."
       : status === 1 ? "Flagged. Reported by " + people + ", with " + fmt(BOND * BigInt(reporters)) + " MUSD bonded. Every Sellar safe holds payments to it."
       : status === 3 ? "A report against this address was dismissed as false. Nobody is reporting it now."
@@ -426,7 +457,7 @@ $("scam-form").addEventListener("submit", async (e) => {
     $("scam-acts").hidden = false;
     $("scam-report").hidden = status === 2 || mine;
     $("scam-bond").hidden = !mine;
-  } catch (err) { out.className = "note bad"; out.textContent = "Could not check. " + explain(err); }
+  } catch (err) { out.className = "result bad"; out.textContent = "Could not check. " + explain(err); }
 });
 $("scam-report").addEventListener("click", () => {
   if (needWallet() || !checked) return;

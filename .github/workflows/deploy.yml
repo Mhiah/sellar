@@ -19,9 +19,12 @@ jobs:
       - uses: foundry-rs/foundry-toolchain@v1
       - run: forge test --no-match-contract ForkTest
       - name: Deploy
-        run: forge script script/Deploy.s.sol --rpc-url ${{ inputs.network }} --broadcast
+        run: |
+          # Wallets export keys without the 0x prefix; accept either form.
+          export PRIVATE_KEY="0x${DEPLOYER_KEY#0x}"
+          forge script script/Deploy.s.sol --rpc-url ${{ inputs.network }} --broadcast
         env:
-          PRIVATE_KEY: ${{ secrets.DEPLOYER_KEY }}
+          DEPLOYER_KEY: ${{ secrets.DEPLOYER_KEY }}
       - name: Keep the deployment record
         uses: actions/upload-artifact@v4
         with:

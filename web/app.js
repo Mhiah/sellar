@@ -293,8 +293,11 @@ function renderFacts(loan) {
   }
 }
 
-async function renderPayees() {
+async function renderPayees(seen) {
+  // Trusted payees cannot be listed from the contract directly. Candidates: names saved in this browser,
+  // Trusted events (when the node allows the search), and every address this safe has paid or been asked to pay.
   const found = new Map(Object.keys(names()).map((a) => [a, true]));
+  for (const a of seen || []) found.set(a.toLowerCase(), true);
   try {
     const logs = await rpc("eth_getLogs", [{ address: NET.safe, fromBlock: "0x0", toBlock: "latest", topics: [TOPIC_TRUSTED, "0x" + pad(me)] }]);
     for (const l of logs) found.set("0x" + l.topics[2].slice(26), true);
@@ -421,7 +424,7 @@ async function refresh() {
     $("wallet-musd").textContent = fmt(walletMusd);
     renderRules();
     await renderWaiting(holds);
-    await renderPayees();
+    await renderPayees([...holds.map((h) => h.to), ...receipts.map((r) => r.to)]);
     await renderActivity(holds.filter((h) => h.state !== 2), receipts);
     await renderTry(holds);
   } catch (e) {

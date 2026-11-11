@@ -40,7 +40,7 @@ knows you asked for 5, so the payment waits for you
 
 ![The Sellar dashboard: two held payments with the reason for each, and Release and Reject buttons](docs/img/dashboard.png)
 
-*The image shows sample data. The live site reads your own safe from Mezo testnet.*
+*The team's test safe on Mezo testnet with two real held payments, in read-only view. [See that safe live](https://mhiah.github.io/sellar/?view=0xE6d044BEB44390CCe70C436CAe2BD2AEE602077E), no wallet needed. Connect your own wallet to see yours.*
 
 | Section | What you do there |
 |---|---|
@@ -70,6 +70,10 @@ Confirmed scam. Every Sellar safe refuses to release payments to this address.
 ```
 
 That is the scammer from the live run below, read straight from the SellarShield contract.
+
+To look at a real safe with its full history, open
+[the team's test safe in read-only view](https://mhiah.github.io/sellar/?view=0xE6d044BEB44390CCe70C436CAe2BD2AEE602077E)
+and click **Activity**. Any safe can be viewed this way by putting its owner's address after `?view=`.
 
 **2. Run the contract tests (1 minute)**
 

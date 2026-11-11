@@ -44,6 +44,7 @@ That exchange is a real transaction on Mezo testnet:
 | SellarSafe | [`0x9bf0180a21fFfB35b815Bf0B264706E72e0a26Aa`](https://explorer.test.mezo.org/address/0x9bf0180a21fFfB35b815Bf0B264706E72e0a26Aa) |
 | SellarShield | [`0x799d90D2FA41b9827c345E480BEC635B3EF0c444`](https://explorer.test.mezo.org/address/0x799d90D2FA41b9827c345E480BEC635B3EF0c444) |
 | Source | Verified on Mezo's explorer and on Sourcify |
+| Website | [mhiah.github.io/sellar](https://mhiah.github.io/sellar/) |
 | Live proof | [docs/EVIDENCE.md](docs/EVIDENCE.md): every step below as a linked transaction |
 | Audit | None. Testnet only |
 | Users | Team test wallets only so far. No outside users yet |
@@ -193,7 +194,7 @@ The only special role is the reviewer, who can confirm or dismiss a case and not
 
 ## The website
 
-`web/` is the owner's side: a static page with no dependencies that talks to your wallet and to
+[mhiah.github.io/sellar](https://mhiah.github.io/sellar/) is the owner's side. It lives in `web/`: a static page with no dependencies that talks to your wallet and to
 Mezo directly.
 
 | Section | What you do there |

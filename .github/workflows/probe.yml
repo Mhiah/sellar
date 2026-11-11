@@ -37,3 +37,8 @@ jobs:
           echo "shield.reviewer $(cast call $SHIELD 'reviewer()(address)')"
           echo "safe.feeBps     $(cast call $SAFE 'feeBps()(uint256)')"
           echo "loanHealth      $(cast call $SAFE 'loanHealth(address)(bool,uint256)' $ME)"
+          echo "--- owner decisions (last 6000 blocks)"
+          NOW=$(cast block-number); FROM=$((NOW-6000))
+          for EV in 'Approved(uint256)' 'Rejected(uint256)'; do
+            cast logs --from-block $FROM --to-block latest --address $SAFE "$EV" --json | jq -r --arg ev "$EV" '.[] | "\($ev) hold=\(.topics[1]) tx=\(.transactionHash) block=\(.blockNumber)"' || true
+          done

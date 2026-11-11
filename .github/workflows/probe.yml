@@ -1,0 +1,39 @@
+name: probe
+on:
+  workflow_dispatch:
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: foundry-rs/foundry-toolchain@v1
+      - name: Read live Mezo testnet state
+        env:
+          DEPLOYER_KEY: ${{ secrets.DEPLOYER_KEY }}
+          ETH_RPC_URL: https://rpc.test.mezo.org
+        run: |
+          ME=$(cast wallet address --private-key "0x${DEPLOYER_KEY#0x}")
+          BO=0xCdF7028ceAB81fA0C6971208e83fa7872994beE5
+          TM=0xE47c80e8c23f6B4A1aE41c34837a0599D5D16bb0
+          PF=0x86bCF0841622a5dAC14A313a15f96A95421b9366
+          MUSD=0x118917a40FAF1CD7a13dB0Ef56C86De7973Ac503
+          SAFE=0x9bf0180a21fFfB35b815Bf0B264706E72e0a26Aa
+          SHIELD=0x799d90D2FA41b9827c345E480BEC635B3EF0c444
+          echo "deployer        $ME"
+          echo "btc balance     $(cast balance $ME --ether)"
+          echo "gas price wei   $(cast gas-price)"
+          PRICE=$(cast call $PF 'fetchPrice()(uint256)')
+          echo "btc price       $PRICE"
+          echo "min net debt    $(cast call $BO 'minNetDebt()(uint256)')"
+          echo "gas comp        $(cast call $BO 'MUSD_GAS_COMPENSATION()(uint256)')"
+          echo "fee on 1800     $(cast call $BO 'getBorrowingFee(uint256)(uint256)' 1800000000000000000000)"
+          echo "CCR             $(cast call $BO 'CCR()(uint256)')"
+          echo "recovery mode   $(cast call $TM 'checkRecoveryMode(uint256)(bool)' ${PRICE%% *})"
+          echo "TCR             $(cast call $TM 'getTCR(uint256)(uint256)' ${PRICE%% *})"
+          echo "musd balance    $(cast call $MUSD 'balanceOf(address)(uint256)' $ME)"
+          echo "safe code bytes $(cast code $SAFE | wc -c)"
+          echo "shield code     $(cast code $SHIELD | wc -c)"
+          echo "shield.safe     $(cast call $SHIELD 'safe()(address)')"
+          echo "shield.reviewer $(cast call $SHIELD 'reviewer()(address)')"
+          echo "safe.feeBps     $(cast call $SAFE 'feeBps()(uint256)')"
+          echo "loanHealth      $(cast call $SAFE 'loanHealth(address)(bool,uint256)' $ME)"

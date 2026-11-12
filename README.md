@@ -4,7 +4,7 @@
 
 [Open the dashboard](https://sellar.myacxt.site/) | [See every live transaction](docs/EVIDENCE.md) | Mezo Buildathon, Track 2: Access and Distribution
 
-## What we are building
+## What we built
 
 People are starting to let AI agents pay for things. The agent holds a wallet, reads email and
 web pages, and sends money with nobody checking. One planted sentence in an invoice email ("our
@@ -32,7 +32,7 @@ and enforces it on Mezo.
 **In one example:** you tell your agent "pay Ade 5 MUSD". The agent tries to send Ade 12. Ade is a
 trusted payee and 12 MUSD is within your limits, so a rules-only wallet would pay. Sellar's guard
 knows you asked for 5, so the payment waits for you
-([this happened on Mezo testnet](https://explorer.test.mezo.org/tx/0x1422f55fe82078022bd81f55751dcf35fa69ec68b0a2b01885a6355754189e57)).
+([this happened on Mezo testnet](https://explorer.test.mezo.org/tx/0xb47fd3257b2d1a1bfa3fe1032134cda0056d4aaf0cd4a0aa273642cb12c15fe6)).
 
 ## The dashboard
 

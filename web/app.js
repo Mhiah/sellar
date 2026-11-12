@@ -435,7 +435,7 @@ async function renderTry(holds) {
   });
   $("t2-go").disabled = $("t2-go").disabled || claimed === 1n || left === 0n;
   $("t2-hint").textContent = claimed === 1n ? "This address has had its 25 test MUSD. Your safe holds " + fmt(account.balance) + " MUSD."
-    : left === 0n ? "The test faucet is empty right now. You can still deposit your own test MUSD under Waiting."
+    : left === 0n ? "The test faucet is empty right now. You can still deposit your own test MUSD under Approvals."
     : "Sellar's test faucet puts 25 MUSD straight into your safe. Once per address.";
   $("t3-go").disabled = $("t3-go").disabled || isAgent;
   $("t3-go").textContent = hasAgent && !isAgent ? "Replace my agent for this test" : "Use this wallet as the agent";
@@ -461,7 +461,7 @@ function tryRequest(fromInvoice) {
     // For the invoice case, carry what the guard would report: 0x5e11, then flag 1 (address came from content).
     const memo = "0x" + (fromInvoice ? "5e1101" + randomHex(29) : randomHex(32));
     await send(NET.safe, enc(SIG.request, me, to, 5n * 10n ** 18n, memo, fromInvoice), "Agent asks to pay 5 MUSD");
-    say("The safe held it. Open Waiting to release or reject it.");
+    say("The safe held it. Open Approvals to release or reject it.");
   });
 }
 

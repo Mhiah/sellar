@@ -44,7 +44,7 @@ knows you asked for 5, so the payment waits for you
 
 | Section | What you do there |
 |---|---|
-| Waiting | See each held payment and why it was held. Release or reject it. Add or take out MUSD. |
+| Approvals | See each held payment and why it was held. Release or reject it. Add or take out MUSD. |
 | Payees | Choose the addresses your agent may pay on its own. |
 | Rules | Name the agent key, set the limits and the loan floor, freeze the agent. |
 | Scam list | Check any address. Report one. Take a bond back. |
@@ -132,7 +132,7 @@ page walks you through five steps and ticks each one off from what is on-chain:
 2. Get 25 test MUSD straight into your safe from Sellar's faucet. No Mezo loan needed.
 3. Let your wallet act as the agent, with a 10 MUSD limit per payment.
 4. Act as the agent: **Pay a stranger**, or **Pay the address from a fake invoice email**.
-5. Act as the owner: open **Waiting** and release or reject what was held.
+5. Act as the owner: open **Approvals** and release or reject what was held.
 
 Result: both payments are held and nothing leaves your safe until you release it. The fake-invoice
 one shows the reason "This address came from something your agent read, not from you." On that

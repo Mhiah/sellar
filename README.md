@@ -2,7 +2,7 @@
 
 **A safe on Mezo for AI agents that pay in MUSD. The agent can ask to pay. It cannot pay alone.**
 
-[Open the dashboard](https://sellar.myacxt.site/) | [See every live transaction](docs/EVIDENCE.md) | Mezo Buildathon, Track 2: Access and Distribution
+[Open the dashboard](https://sellar.myacxt.site/) | [See every live transaction](docs/EVIDENCE.md) | [Read the deck](docs/Sellar-deck.pdf) | Mezo Buildathon, Track 2: Access and Distribution
 
 ## What we built
 

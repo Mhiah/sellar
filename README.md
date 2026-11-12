@@ -138,8 +138,7 @@ button the page plays the guard for you, since there is no real agent reading a 
 ## Results: what ran live on Mezo testnet
 
 The contracts are deployed and source-verified. Every step below is a real transaction, linked in
-[docs/EVIDENCE.md](docs/EVIDENCE.md). Steps 1 to 11 ran on the current contracts (version 2). Steps 12
-and 13 were sent from the dashboard on version 1 and are linked in
+[docs/EVIDENCE.md](docs/EVIDENCE.md). All of them ran on the current contracts (version 2). The first run, on version 1, is kept in
 [docs/EVIDENCE-v1.md](docs/EVIDENCE-v1.md).
 
 | # | What happened | Result |

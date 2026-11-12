@@ -93,4 +93,15 @@ In the third row the on-chain rules alone would have paid: the vendor is trusted
 
 ---
 
+## The owner decides on the dashboard
+
+Sent from the website, [mhiah.github.io/sellar](https://mhiah.github.io/sellar/), by the owner's own wallet (a team test wallet, `0xE6d044BEB44390CCe70C436CAe2BD2AEE602077E`), on the two holds the guard run left waiting.
+
+| # | Step | Result | Transaction |
+|---|---|---|---|
+| 1 | Owner clicks **Release** on hold 4 ("This is more than you asked for.") | 12 MUSD paid to Ade. Safe balance 64.91 to 52.88 MUSD (12 plus the 0.03 MUSD cover fee) | [`0x9ed29a9e…`](https://explorer.test.mezo.org/tx/0x9ed29a9ecf56526bf2c73ebc3c4ab607be98f964c96933da4169bac3a27baa29) |
+| 2 | Owner clicks **Reject** on hold 3 ("This address came from something your agent read, not from you.") | Rejected. Nothing left the safe | [`0xa20f92be…`](https://explorer.test.mezo.org/tx/0xa20f92be37e75dfd02862ca913d21c4ce997de464454a2d8759dcafb9e452c07) |
+
+---
+
 The first live run, the first guard runs and the first release and reject sent from the dashboard were on the version 1 contracts. They are kept in [EVIDENCE-v1.md](EVIDENCE-v1.md).

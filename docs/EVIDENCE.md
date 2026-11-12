@@ -95,7 +95,7 @@ In the third row the on-chain rules alone would have paid: the vendor is trusted
 
 ## The owner decides on the dashboard
 
-Sent from the website, [mhiah.github.io/sellar](https://mhiah.github.io/sellar/), by the owner's own wallet (a team test wallet, `0xE6d044BEB44390CCe70C436CAe2BD2AEE602077E`), on the two holds the guard run left waiting.
+Sent from the website (now at [sellar.myacxt.site](https://sellar.myacxt.site/), then at mhiah.github.io/sellar), by the owner's own wallet (a team test wallet, `0xE6d044BEB44390CCe70C436CAe2BD2AEE602077E`), on the two holds the guard run left waiting.
 
 | # | Step | Result | Transaction |
 |---|---|---|---|

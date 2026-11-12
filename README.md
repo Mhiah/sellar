@@ -2,7 +2,7 @@
 
 **A safe on Mezo for AI agents that pay in MUSD. The agent can ask to pay. It cannot pay alone.**
 
-[Open the dashboard](https://mhiah.github.io/sellar/) | [See every live transaction](docs/EVIDENCE.md) | Mezo Buildathon, Track 2: Access and Distribution
+[Open the dashboard](https://sellar.myacxt.site/) | [See every live transaction](docs/EVIDENCE.md) | Mezo Buildathon, Track 2: Access and Distribution
 
 ## What we are building
 
@@ -36,11 +36,11 @@ knows you asked for 5, so the payment waits for you
 
 ## The dashboard
 
-**[mhiah.github.io/sellar](https://mhiah.github.io/sellar/)**
+**[sellar.myacxt.site](https://sellar.myacxt.site/)**
 
 ![The Sellar dashboard: two held payments with the reason for each, and Release and Reject buttons](docs/img/dashboard.png)
 
-*The team's test safe on Mezo testnet with two real held payments, in read-only view. [See that safe live](https://mhiah.github.io/sellar/?view=0xE6d044BEB44390CCe70C436CAe2BD2AEE602077E), no wallet needed. Connect your own wallet to see yours.*
+*The team's test safe on Mezo testnet, captured in read-only view with two real held payments waiting. [See that safe live](https://sellar.myacxt.site/?view=0xE6d044BEB44390CCe70C436CAe2BD2AEE602077E), no wallet needed. Connect your own wallet to see yours.*
 
 | Section | What you do there |
 |---|---|
@@ -55,7 +55,7 @@ knows you asked for 5, so the payment waits for you
 
 **1. See it live, no wallet needed (30 seconds)**
 
-Open [the dashboard](https://mhiah.github.io/sellar/). The **Cover fund** card shows the fund's
+Open [the dashboard](https://sellar.myacxt.site/). The **Cover fund** card shows the fund's
 real balance, read from Mezo testnet. Then open **Scam list**, paste this address and press
 **Check**:
 
@@ -72,7 +72,7 @@ Confirmed scam. Every Sellar safe refuses to release payments to this address.
 That is the scammer from the live run below, read straight from the SellarShield contract.
 
 To look at a real safe with its full history, open
-[the team's test safe in read-only view](https://mhiah.github.io/sellar/?view=0xE6d044BEB44390CCe70C436CAe2BD2AEE602077E)
+[the team's test safe in read-only view](https://sellar.myacxt.site/?view=0xE6d044BEB44390CCe70C436CAe2BD2AEE602077E)
 and click **Activity**. Any safe can be viewed this way by putting its owner's address after `?view=`.
 
 **2. Run the contract tests (1 minute)**
@@ -122,7 +122,7 @@ Result:
 
 **4. Play the agent and the owner yourself (2 minutes, one wallet)**
 
-Open [the dashboard](https://mhiah.github.io/sellar/), connect a wallet and choose **Try it**. The
+Open [the dashboard](https://sellar.myacxt.site/), connect a wallet and choose **Try it**. The
 page walks you through five steps and ticks each one off from what is on-chain:
 
 1. Get test BTC for fees from [Mezo's faucet](https://faucet.test.mezo.org/).

@@ -224,6 +224,21 @@ contract AuditTest is Base {
         assertEq(musd.balanceOf(ben), benDeposit);
     }
 
+    function test_ConfirmedScamIsHeldAndTheReasonSaysSo() public {
+        vm.prank(ada);
+        safe.trust(scammer); // trusted before anyone knew
+        vm.warp(block.timestamp + 2 hours);
+        _report(ben, scammer);
+        vm.prank(reviewer);
+        shield.confirm(scammer);
+        assertEq(safe.check(ada, scammer, 1e18) & safe.R_CONFIRMED_SCAM(), safe.R_CONFIRMED_SCAM());
+        (bool paid, uint256 id) = _request(scammer, 1e18);
+        assertFalse(paid);
+        (,,,, uint32 reasons,,) = safe.holds(id);
+        assertEq(reasons & safe.R_CONFIRMED_SCAM(), safe.R_CONFIRMED_SCAM());
+        assertEq(musd.balanceOf(scammer), 0);
+    }
+
     // ------------------------------------------------------------ findings (weaknesses reproduced)
 
     /// F-01. A scammer can pay himself from accounts he controls, get himself (correctly) confirmed

@@ -93,17 +93,17 @@ Ran 26 tests for test/SellarShield.t.sol:SellarShieldTest
 Suite result: ok. 26 passed; 0 failed; 0 skipped
 Ran 12 tests for test/SellarV2.t.sol:SellarV2Test
 Suite result: ok. 12 passed; 0 failed; 0 skipped
-Ran 18 tests for test/Audit.t.sol:AuditTest
-Suite result: ok. 18 passed; 0 failed; 0 skipped
+Ran 19 tests for test/Audit.t.sol:AuditTest
+Suite result: ok. 19 passed; 0 failed; 0 skipped
 Ran 4 tests for test/SellarFaucet.t.sol:SellarFaucetTest
 Suite result: ok. 4 passed; 0 failed; 0 skipped
 Ran 1 test for test/Invariants.t.sol:InvariantsTest
 Suite result: ok. 1 passed; 0 failed; 0 skipped
-Ran 7 test suites: 88 tests passed, 0 failed, 5 skipped (93 total tests)
+Ran 7 test suites: 89 tests passed, 0 failed, 5 skipped (94 total tests)
 ```
 
 The invariant suite checks four invariants. Current Foundry (1.9) counts them as one test, as
-shown here. Older versions count them as four and report 91 passed.
+shown here. Older versions count them as four and report 92 passed.
 
 The 5 skipped tests are the ones that need Mezo's network. Run them against a fork of Mezo
 testnet, with Mezo's real MUSD and Stability Pool:
@@ -169,7 +169,7 @@ The contracts are deployed and source-verified. Every step below is a real trans
 | SellarShield | [`0x245C2cA317F640b8976e2584d68Eed59Fc698701`](https://explorer.test.mezo.org/address/0x245C2cA317F640b8976e2584d68Eed59Fc698701) |
 | SellarFaucet (testnet only) | [`0x87737a1e1BF82d90564A13a170c687a84191BAbd`](https://explorer.test.mezo.org/address/0x87737a1e1BF82d90564A13a170c687a84191BAbd) |
 | Source | Verified on Mezo's explorer and on Sourcify |
-| Tests | 87 contract tests and 4 invariants, 5 fork tests, 23 guard tests. All run on every push |
+| Tests | 88 contract tests and 4 invariants, 5 fork tests, 23 guard tests. All run on every push |
 | Audit | None. Testnet only |
 | Users | Team test wallets only so far. No outside users yet |
 

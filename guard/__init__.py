@@ -21,6 +21,11 @@ from .sellar_guard import GuardedWallet, SellarClient
 
 _WALLETS: dict[str, GuardedWallet] = {}
 _OWN_TOOLS = {"sellar_pay", "sellar_status"}
+# Conversations where a hook failed to record what the agent read. The guard is then blind to where
+# addresses came from, so it sends every payment in that conversation to the owner.
+_BLIND: set[str] = set()
+_BLIND_TEXT = ("The guard could not record everything the agent read in this conversation, so it cannot tell "
+               "where this address came from.")
 
 PAY_SCHEMA = {
     "name": "sellar_pay",
@@ -60,7 +65,7 @@ def _on_pre_llm_call(user_message: str = "", **kwargs: Any):
     try:
         _wallet(kwargs).note_user(user_message or "")
     except Exception:
-        pass
+        _BLIND.add(_cid(kwargs))
     return None
 
 
@@ -70,7 +75,7 @@ def _on_post_tool_call(tool_name: str = "", result: Any = "", **kwargs: Any):
     try:
         _wallet(kwargs).note_content(result if isinstance(result, str) else json.dumps(result, default=str))
     except Exception:
-        pass
+        _BLIND.add(_cid(kwargs))
     return None
 
 
@@ -78,7 +83,10 @@ def tool_pay(args: dict, **kwargs: Any) -> str:
     if "SELLAR_OWNER" not in os.environ and _cid(kwargs) not in _WALLETS:
         return json.dumps({"status": "refused", "message": "Sellar is not set up: SELLAR_OWNER and SELLAR_AGENT_KEY "
                                                            "are missing. Nothing was paid."})
-    r = _wallet(kwargs).pay(str(args.get("to", "")), float(args.get("amount") or 0), str(args.get("memo", "")))
+    wallet = _wallet(kwargs)
+    if _cid(kwargs) in _BLIND:
+        wallet.blind = _BLIND_TEXT
+    r = wallet.pay(str(args.get("to", "")), float(args.get("amount") or 0), str(args.get("memo", "")))
     return json.dumps({"status": r.status, "message": r.message, "hold_id": r.hold_id, "transaction": r.url})
 
 

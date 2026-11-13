@@ -1,0 +1,72 @@
+name: audit
+# Evidence for the security audit: what is really deployed and how it is served.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  live-checks:
+    runs-on: ubuntu-latest
+    env:
+      SITE: https://sellar.myacxt.site
+      ETH_RPC_URL: https://rpc.test.mezo.org
+      SAFE: "0x9e0Fe4b54f80A62527A7a2A19DEDd3c97e66FD3A"
+      SHIELD: "0x245C2cA317F640b8976e2584d68Eed59Fc698701"
+      FAUCET: "0x87737a1e1BF82d90564A13a170c687a84191BAbd"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: foundry-rs/foundry-toolchain@v1
+      - name: Response headers of the live site
+        run: |
+          curl -sSI "$SITE/" | tr -d '\r' | grep -iE "^HTTP|content-security-policy|x-frame-options|x-content-type-options|referrer-policy|permissions-policy|strict-transport-security|access-control" || true
+          echo "http -> $(curl -sS -o /dev/null -w '%{http_code} %{redirect_url}' "http://sellar.myacxt.site/")"
+      - name: The live site serves exactly the files in this repository
+        run: |
+          fail=0
+          for f in index.html app.js styles.css favicon.svg; do
+            live=$(curl -sS "$SITE/$f" | sha256sum | cut -c1-16); repo=$(sha256sum "web/$f" | cut -c1-16)
+            if [ "$live" = "$repo" ]; then echo "SAME   $f $live"; else echo "DIFFER $f live=$live repo=$repo"; fail=1; fi
+          done
+          exit $fail
+      - name: Deployed contracts, their links and their fixed settings
+        run: |
+          for a in $SAFE $SHIELD $FAUCET; do echo "code bytes at $a: $(( ($(cast code $a | wc -c) - 3) / 2 ))"; done
+          echo "shield.safe      $(cast call $SHIELD 'safe()(address)')"
+          echo "safe.shield      $(cast call $SAFE 'shield()(address)')"
+          echo "reviewer         $(cast call $SHIELD 'reviewer()(address)')"
+          echo "pendingReviewer  $(cast call $SHIELD 'pendingReviewer()(address)')"
+          echo "feeBps           $(cast call $SAFE 'feeBps()(uint256)')"
+          echo "holdTtl          $(cast call $SAFE 'holdTtl()(uint256)')"
+          echo "bond             $(cast call $SHIELD 'bond()(uint256)')"
+          echo "claimCap         $(cast call $SHIELD 'claimCap()(uint256)')"
+          echo "fundAssets       $(cast call $SHIELD 'fundAssets()(uint256)')"
+          echo "fundLiquid       $(cast call $SHIELD 'fundLiquid()(uint256)')"
+          echo "bondsHeld        $(cast call $SHIELD 'bondsHeld()(uint256)')"
+          echo "musd in shield   $(cast call 0x118917a40FAF1CD7a13dB0Ef56C86De7973Ac503 'balanceOf(address)(uint256)' $SHIELD)"
+          echo "musd in safe     $(cast call 0x118917a40FAF1CD7a13dB0Ef56C86De7973Ac503 'balanceOf(address)(uint256)' $SAFE)"
+          echo "btc for sale     $(cast call $SHIELD 'btcForSale()(uint256)')"
+          echo "faucet drips     $(cast call $FAUCET 'remaining()(uint256)')"
+      - name: Deployed bytecode matches this repository's source
+        working-directory: contracts
+        run: |
+          forge build >/dev/null
+          for pair in "$SAFE:SellarSafe" "$SHIELD:SellarShield" "$FAUCET:SellarFaucet"; do
+            A="${pair%%:*}"; N="${pair##*:}"
+            forge verify-bytecode "$A" "src/$N.sol:$N" --rpc-url "$ETH_RPC_URL" --ignore creation 2>&1 | tail -3 || true
+          done
+  static-analysis:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: foundry-rs/foundry-toolchain@v1
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install slither-analyzer pip-audit
+      - name: Slither
+        working-directory: contracts
+        run: slither . --filter-paths "lib|test|script" --exclude-informational --exclude-optimization || true
+      - name: Python dependency audit
+        run: pip-audit -r guard/requirements.txt

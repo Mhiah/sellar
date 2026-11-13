@@ -98,6 +98,10 @@ class GuardedWallet:
         self.session = session
         self.prov = Provenance()
         self._asked: list[float] = []      # amounts in the most recent user message that named any
+        self._used = 0.0                    # MUSD already paid against those amounts
+        # Set when the harness could not record something the agent read. From then on the guard
+        # cannot tell where an address came from, so every payment goes to the owner.
+        self.blind: Optional[str] = None
         # The guard's own copy of the owner's payee names, used to spot "you said Ade, this is not Ade".
         self.store = Store(memory=True)
         self.store.set_setting("hold_new_payees", False)   # new payees are SellarSafe's call, on-chain
@@ -111,6 +115,7 @@ class GuardedWallet:
         latest = amounts_in(text or "")
         if latest:
             self._asked = latest
+            self._used = 0.0
 
     def note_content(self, text: str) -> None:
         """Something the agent only read: an email, a web page, a file, a tool result."""
@@ -125,6 +130,12 @@ class GuardedWallet:
         view = dict(self.prov.view(self.session))
         view["amounts"] = [(a, "MUSD") for a in self._asked]
         reasons = assess(act, self.store, view)
+        # One request is one payment. Paying the asked amount again, or in pieces that add up to
+        # more, is also "more than you asked".
+        total = sum(self._asked)
+        if self._asked and not any(r.code == "intent" for r in reasons) and self._used + amount > total * (1 + 1e-6):
+            reasons.append(Reason("intent", f"You asked for {total:g} MUSD in total. {self._used:g} MUSD has already "
+                                            f"been paid, and this would bring it to {self._used + amount:g}."))
         # "unknown" (never mentioned anywhere) is also something only the guard can know.
         return [r for r in reasons if r.code in ESCALATE_CODES or r.code == "unknown"]
 
@@ -137,6 +148,9 @@ class GuardedWallet:
         found = self.screen(to, amount)
         escalate = any(r.code in ESCALATE_CODES or r.severity == CRITICAL for r in found)
         guard_reasons = [r.text for r in found]
+        if self.blind:
+            escalate = True
+            guard_reasons.append(self.blind)
 
         try:
             out = self.client.request(to, to_units(amount), build_memo(memo, found), escalate)
@@ -147,6 +161,8 @@ class GuardedWallet:
                    else text[:200])
             return PayResult("refused", f"SellarSafe did not accept the request: {why}. Nothing was paid. Tell the user.",
                              guard_reasons=guard_reasons, escalated=escalate)
+        if out["paid"]:
+            self._used += float(amount)     # a hold is the owner's decision, so only what went out counts
         chain_reasons = describe(out["reasons"])
         common = dict(guard_reasons=guard_reasons, chain_reasons=chain_reasons, tx=out["tx"], url=out["url"],
                       escalated=escalate)

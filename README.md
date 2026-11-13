@@ -93,15 +93,17 @@ Ran 26 tests for test/SellarShield.t.sol:SellarShieldTest
 Suite result: ok. 26 passed; 0 failed; 0 skipped
 Ran 12 tests for test/SellarV2.t.sol:SellarV2Test
 Suite result: ok. 12 passed; 0 failed; 0 skipped
+Ran 18 tests for test/Audit.t.sol:AuditTest
+Suite result: ok. 18 passed; 0 failed; 0 skipped
 Ran 4 tests for test/SellarFaucet.t.sol:SellarFaucetTest
 Suite result: ok. 4 passed; 0 failed; 0 skipped
 Ran 1 test for test/Invariants.t.sol:InvariantsTest
 Suite result: ok. 1 passed; 0 failed; 0 skipped
-Ran 6 test suites: 70 tests passed, 0 failed, 5 skipped (75 total tests)
+Ran 7 test suites: 88 tests passed, 0 failed, 5 skipped (93 total tests)
 ```
 
 The invariant suite checks four invariants. Current Foundry (1.9) counts them as one test, as
-shown here. Older versions count them as four and report 73 passed.
+shown here. Older versions count them as four and report 91 passed.
 
 The 5 skipped tests are the ones that need Mezo's network. Run them against a fork of Mezo
 testnet, with Mezo's real MUSD and Stability Pool:
@@ -167,7 +169,7 @@ The contracts are deployed and source-verified. Every step below is a real trans
 | SellarShield | [`0x245C2cA317F640b8976e2584d68Eed59Fc698701`](https://explorer.test.mezo.org/address/0x245C2cA317F640b8976e2584d68Eed59Fc698701) |
 | SellarFaucet (testnet only) | [`0x87737a1e1BF82d90564A13a170c687a84191BAbd`](https://explorer.test.mezo.org/address/0x87737a1e1BF82d90564A13a170c687a84191BAbd) |
 | Source | Verified on Mezo's explorer and on Sourcify |
-| Tests | 69 contract tests and 4 invariants, 5 fork tests, 16 guard tests. All run on every push |
+| Tests | 87 contract tests and 4 invariants, 5 fork tests, 23 guard tests. All run on every push |
 | Audit | None. Testnet only |
 | Users | Team test wallets only so far. No outside users yet |
 
@@ -251,6 +253,14 @@ Mezo's contract addresses come from the official `@mezo-org/musd-contracts` pack
   confirm a case, which is what unlocks refunds. Without that, someone could report an address they
   control and drain the fund. The reviewer cannot move funds, change parameters or keep bonds
   locked past 30 days. On testnet the reviewer is a team wallet.
+- **Refunds can be gamed by fake victims.** Someone can pay an address they control from several
+  safes, get it confirmed as a scam, and claim refunds as their own victims. A test shows this
+  taking most of a fund for the cost of the fees. On mainnet, refunds would need a review of each
+  claim or a cap for each case. See [docs/AUDIT.md](docs/AUDIT.md), finding F-01.
+- **A flag is free if the reviewer never acts.** The reporter takes the bond back after 30 days,
+  having held up agent payments to that address the whole time. A confirmed address has no appeal.
+- **The daily limit resets at midnight UTC,** so two days' allowance can be spent a few seconds
+  apart.
 - **Stability Pool risk.** Deposits there can shrink in liquidations, and withdrawals pause while
   any loan on Mezo is under-collateralised. Refunds are capped, and a claim may have to wait.
 - **Refunds are partial by design.** At most 500 MUSD, and at most 20% of the fund.
@@ -261,11 +271,14 @@ Mezo's contract addresses come from the official `@mezo-org/musd-contracts` pack
   so other people's activity cannot push yours out. Older ones stay on-chain.
 - **"More than you asked" needs an amount the guard can read**: "5 MUSD", "$5", "5 dollars", or a
   number after pay or send. An amount written out in words is not caught.
+  If you name no amount at all, the guard has nothing to compare, and only your on-chain limits
+  apply. Paying the asked amount a second time is caught.
 - **The guard forgets.** It remembers what you typed and what the agent read for one conversation.
   After a restart, addresses from earlier content count as unknown, so the safe still holds them.
 - **The Hermes adapter is not proven inside Hermes.** It is tested against a stand-in.
 - **No outside users yet.** Every transaction so far is from a team test wallet.
-- **Not audited.** Testnet only.
+- **Not externally audited.** We ran our own security review and wrote down what it found,
+  including what is still open: [docs/AUDIT.md](docs/AUDIT.md). Testnet only.
 
 ## What's next
 
@@ -351,6 +364,7 @@ The agent key is the only key the guard holds, and that key can only ask to pay.
 | `contracts/test/Invariants.t.sol` | Random owners, agents, reporters and pool behaviour. The safe always holds what owners are owed, bonds are always there, and no payment ever leaves unattended against the rules. |
 | `contracts/test/Fork.t.sol` | Pay, hold, report, confirm, refund and the Stability Pool deposit against Mezo's real testnet contracts. |
 | `contracts/test/SellarV2.t.sol` | Selling the fund's BTC (price, discount, the reporters' share kept back, the buyer's limit), per-owner lists, releases not counting toward the daily limit, no refund for a payer who was warned. |
+| `contracts/test/Audit.t.sol` | The security review: a hostile caller against every control (who can spend, release, resolve, record), re-entry while being paid BTC, and a test for each weakness found, named `test_Finding_F..`. |
 | `contracts/test/SellarFaucet.t.sol` | One drip per address, an empty faucet, and the whole try-it path with one wallet. |
 | `guard/tests/test_guard.py` | The guard's decisions, the transaction encoding and the Hermes adapter. |
 

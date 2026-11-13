@@ -4,6 +4,10 @@ on:
   pull_request:
   workflow_dispatch:
 
+# The workflow token can only read the repository.
+permissions:
+  contents: read
+
 jobs:
   unit:
     runs-on: ubuntu-latest

@@ -13,6 +13,10 @@ on:
         type: boolean
         default: false
 
+# The workflow token can only read the repository.
+permissions:
+  contents: read
+
 jobs:
   test:
     runs-on: ubuntu-latest
@@ -41,6 +45,7 @@ jobs:
       - name: Guard run on Mezo testnet
         env:
           DEPLOYER_KEY: ${{ secrets.DEPLOYER_KEY }}
+          KEEP_HOLDS: ${{ inputs.keep_holds }}
         run: |
           K="0x${DEPLOYER_KEY#0x}"
           derive() { cast keccak "$(cast concat-hex "$K" "$(cast from-utf8 "$1")")"; }
@@ -49,7 +54,7 @@ jobs:
           export VENDOR=$(cast wallet address --private-key "$(derive vendor)")
           python -m guard.demo_live
           echo
-          if [ "${{ inputs.keep_holds }}" = "true" ]; then
+          if [ "$KEEP_HOLDS" = "true" ]; then
             echo "Left waiting for the owner: holds $(tr '\n' ' ' < guard-holds.txt)"
             exit 0
           fi
